@@ -1,0 +1,7 @@
+#word files
+*.docx
+*.doc
+
+#working files
+*.o
+*.exe
