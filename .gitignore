@@ -5,3 +5,9 @@
 #working files
 *.o
 *.exe
+
+#vs files
+.vs
+
+# tmp file created by dir command
+tmp.txt
