@@ -265,6 +265,30 @@ int main(int argc, char *argv[]) {
 	 		//OPTIONAL, delete the temporary file
 	 		//system("del tmp.txt");
 	 	}
+		// RETR Command
+		// TODO GET
+		if (strncmp(receive_buffer, "RETR", 4) == 0) {
+			sprintf(send_buffer, "404 STOR STUB FUNCTION");
+			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+			printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
+			printf("Connected to client\n");
+		}
+		// STOR Command
+		// TODO PUT
+		if (strncmp(receive_buffer,"STOR",4) == 0) {
+				sprintf(send_buffer, "404 STOR STUB FUNCTION");
+				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+				printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
+				printf("Connected to client\n");
+		}
+		// CWD Command
+		// TODO CD
+		if (strncmp(receive_buffer, "CWD", 3) == 0) {
+			sprintf(send_buffer, "404 CWD STOR FUNCTION");
+			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+			printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
+			printf("Connected to client\n");
+		}
 	 //=================================================================================
 	 }//End of COMMUNICATION LOOP per CLIENT
 	 //=================================================================================
@@ -278,7 +302,7 @@ int main(int argc, char *argv[]) {
 	  //bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 
 	 	//====================================================================================
-	 	} //End of MAIN LOOP
+	} //End of MAIN LOOP
 	 	//====================================================================================
 	closesocket(s);
 	printf("\nSERVER SHUTTING DOWN...\n");
