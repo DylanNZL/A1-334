@@ -22,6 +22,9 @@
  * TODO:
  		Task - assignee
  *  Change to IPV6 data structures (might have to do this before implementing commands) -
+ *			https://msdn.microsoft.com/en-us/library/windows/desktop/ms740504(v=vs.85).aspx
+ *			https://msdn.microsoft.com/en-us/library/windows/desktop/ms737530(v=vs.85).aspx
+ *			https://msdn.microsoft.com/en-us/library/zx63b042.aspx
  *	Implement put (STOR) -
  *  Implement get (RETR) -
  *  Implement cd (CWD) -
@@ -55,6 +58,10 @@ int main(int argc, char *argv[]) {
 	// TODO: Convert to ipv6 data structures
 	struct sockaddr_in localaddr,remoteaddr;  //ipv4 only
 	struct sockaddr_in local_data_addr_act; //ipv4 only
+
+	//struct sockaddr_storage localaddr, remoteaddr; // IPV6-compatible
+	//struct sockaddr_storage local_data_addr_act; // IPV6-compatible
+
 	SOCKET s,ns;
 	SOCKET ns_data, s_data_act;
 	char send_buffer[200],receive_buffer[200];
@@ -75,7 +82,8 @@ int main(int argc, char *argv[]) {
   if (s <0) {
  	 printf("socket failed\n");
   }
-  localaddr.sin_family = AF_INET;
+  localaddr.sin_family = AF_INET; // IPV4 Version
+	//localaddr.sin_family = AF_INET6; // IPV6 and IPV4 compatable (http://www.ibm.com/support/knowledgecenter/ssw_ibm_i_71/rzab6/uafinet6.htm)
   //CONTROL CONNECTION:  port number = content of argv[1]
   if (argc == 2) {
  	 localaddr.sin_port = htons((u_short)atoi(argv[1])); //ipv4 only
@@ -263,15 +271,38 @@ int main(int argc, char *argv[]) {
 	 		if (active==0 )closesocket(ns_data);
 	 		else closesocket(s_data_act);
 	 		//OPTIONAL, delete the temporary file
-	 		//system("del tmp.txt");
+	 		system("del tmp.txt");
 	 	}
 		// RETR Command
 		// TODO GET
 		if (strncmp(receive_buffer, "RETR", 4) == 0) {
-			sprintf(send_buffer, "404 STOR STUB FUNCTION");
-			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-			printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
-			printf("Connected to client\n");
+			char filename[200];
+			strncpy(filename, &receive_buffer[5], 194);
+			printf("Get: [%s]", filename);
+			FILE *fin=fopen(filename,"r");//open tmp.txt file
+			if (fin == NULL) {
+				
+			}
+	 		//sprintf(send_buffer,"125 Transfering... \r\n");
+	 		sprintf(send_buffer,"150 Opening ASCII mode data connection... \r\n");
+	 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+	 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+	 		char temp_buffer[80];
+	 		while (!feof(fin)){
+	 			fgets(temp_buffer,78,fin);
+	 			sprintf(send_buffer,"%s",temp_buffer);
+	 			if (active==0) send(ns_data, send_buffer, strlen(send_buffer), 0);
+	 			else send(s_data_act, send_buffer, strlen(send_buffer), 0);
+	 		}
+	 		fclose(fin);
+	 		//sprintf(send_buffer,"250 File transfer completed... \r\n");
+	 		sprintf(send_buffer,"226 File transfer complete. \r\n");
+	 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+	 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+	 		if (active==0 )closesocket(ns_data);
+	 		else closesocket(s_data_act);
+	 		//OPTIONAL, delete the temporary file
+	 		//system("del tmp.txt");*/
 		}
 		// STOR Command
 		// TODO PUT
@@ -284,9 +315,9 @@ int main(int argc, char *argv[]) {
 		// CWD Command
 		// TODO CD
 		if (strncmp(receive_buffer, "CWD", 3) == 0) {
-			sprintf(send_buffer, "404 CWD STOR FUNCTION");
+			sprintf(send_buffer, "220 CWD STUB FUNCTION");
 			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-			printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
+			printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
 			printf("Connected to client\n");
 		}
 	 //=================================================================================
