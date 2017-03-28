@@ -275,34 +275,38 @@ int main(int argc, char *argv[]) {
 	 	}
 		// RETR Command
 		// TODO GET
+		/*
+		 * Codes:
+		 *	226 if the file was successfully transferred
+		 *	550 for file-does-not-exist, permission-denied, etc.
+		 */
 		if (strncmp(receive_buffer, "RETR", 4) == 0) {
 			char filename[200];
 			strncpy(filename, &receive_buffer[5], 194);
 			printf("Get: [%s]", filename);
 			FILE *fin=fopen(filename,"r");//open tmp.txt file
 			if (fin == NULL) {
-				
+				sprintf(send_buffer,"550 File '%s' not found\r\n", filename);
+		 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+		 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+			} else {
+		 		sprintf(send_buffer,"150 Opening ASCII mode data connection... \r\n");
+		 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+		 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+		 		char temp_buffer[80];
+		 		while (!feof(fin)){
+		 			fgets(temp_buffer,78,fin);
+		 			sprintf(send_buffer,"%s",temp_buffer);
+		 			if (active == 0) send(ns_data, send_buffer, strlen(send_buffer), 0);
+		 			else send(s_data_act, send_buffer, strlen(send_buffer), 0);
+		 		}
+				sprintf(send_buffer,"226 File transfer complete. \r\n");
+		 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+		 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 			}
-	 		//sprintf(send_buffer,"125 Transfering... \r\n");
-	 		sprintf(send_buffer,"150 Opening ASCII mode data connection... \r\n");
-	 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
-	 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-	 		char temp_buffer[80];
-	 		while (!feof(fin)){
-	 			fgets(temp_buffer,78,fin);
-	 			sprintf(send_buffer,"%s",temp_buffer);
-	 			if (active==0) send(ns_data, send_buffer, strlen(send_buffer), 0);
-	 			else send(s_data_act, send_buffer, strlen(send_buffer), 0);
-	 		}
 	 		fclose(fin);
-	 		//sprintf(send_buffer,"250 File transfer completed... \r\n");
-	 		sprintf(send_buffer,"226 File transfer complete. \r\n");
-	 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
-	 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-	 		if (active==0 )closesocket(ns_data);
+	 		if (active == 0 )closesocket(ns_data);
 	 		else closesocket(s_data_act);
-	 		//OPTIONAL, delete the temporary file
-	 		//system("del tmp.txt");*/
 		}
 		// STOR Command
 		// TODO PUT
