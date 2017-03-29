@@ -349,11 +349,24 @@ int main(int argc, char *argv[]) {
 			printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
 		}
 		// CWD Command
-		// TODO CD
+		// TODO Check permissions (eg can't access VIP folder unless you are logged in as ?? etc)
 		if (strncmp(receive_buffer, "CWD", 3) == 0) {
-			sprintf(send_buffer, "220 CWD STUB FUNCTION\r\n");
-			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-			printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
+			char name[200];
+			strncpy(name, &receive_buffer[4], 195);
+			char foldername[203];
+			sprintf(foldername, "cd %s", name);
+			printf("Get: %s\n", foldername);
+
+			if (system(foldername) == 0) {
+				sprintf(send_buffer, "220 Changed directory to %s\r\n", name);
+				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+				printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
+			} else {
+				sprintf(send_buffer, "550 Directory Not Found\r\n");
+				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+				printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
+			}
+
 		}
 	 		//========================================================================
 	 }	//End of COMMUNICATION LOOP per CLIENT
