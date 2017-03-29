@@ -324,29 +324,24 @@ int main(int argc, char *argv[]) {
 			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 			char temp_buffer[200];
 			n=0;
-			// TODO: make the loop reliant on recieving data
-			// Currently breaks upon recieving one line of data
 			while (true) {
-				while (true) {
-					if (active==0) bytes = recv(ns, &temp_buffer[n], 1, 0);
-					else bytes = recv(s_data_act, &temp_buffer[n], 1, 0);
-					printf("Recv : %s\n", temp_buffer);
-					if ((bytes < 0) || (bytes == 0)) break;
-			 		if (temp_buffer[n] == '\n') { /*end on a LF*/
-			 			temp_buffer[n] = '\0';
-			 			break;
-			 		}
-			 		if (temp_buffer[n] != '\r') n++; /*Trim CRs*/
-				}
-				fprintf(fin, "%s", temp_buffer);
-				break;
+				if (active==0) bytes = recv(ns, &temp_buffer[n], 1, 0);
+				else bytes = recv(s_data_act, &temp_buffer[n], 1, 0);
+				// If bytes == 0 it means its empty/done transferring
+				if ((bytes < 0) || (bytes == 0)) break;
+				if (temp_buffer[n] != '\r') n++; /*Trim CRs*/
 			}
-			printf("final: %s\n", temp_buffer);
 			fclose(fin);
-
-			sprintf(send_buffer, "550 File trandfer unsucessful\r\n");
-			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-			printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
+			if (receive_buffer[0]) {
+				fprintf(fin, "%s", temp_buffer);
+				sprintf(send_buffer, "250 File transfer successful\r\n");
+				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+				printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
+			} else {
+				sprintf(send_buffer, "550 File transfer unsucessful\r\n");
+				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+				printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
+			}
 		}
 		// CWD Command
 		// TODO Check permissions (eg can't access VIP folder unless you are logged in as ?? etc)
