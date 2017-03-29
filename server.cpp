@@ -284,12 +284,12 @@ int main(int argc, char *argv[]) {
 			char filename[200];
 			strncpy(filename, &receive_buffer[5], 194);
 			printf("Get: %s\n", filename);
-			FILE *fin=fopen(filename,"r");//open tmp.txt file
+			FILE *fin=fopen(filename,"r");//open file
 			if (fin == NULL) {
 				sprintf(send_buffer,"550 File '%s' not found\r\n", filename);
 		 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 		 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-			} else {
+			} else { // send file
 		 		sprintf(send_buffer,"150 Opening ASCII mode data connection... \r\n");
 		 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 		 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
@@ -304,7 +304,7 @@ int main(int argc, char *argv[]) {
 		 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 		 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 			}
-	 		fclose(fin);
+	 		fclose(fin); // close file
 	 		if (active == 0 )closesocket(ns_data);
 	 		else closesocket(s_data_act);
 		}
@@ -316,14 +316,37 @@ int main(int argc, char *argv[]) {
 		 *  550 file-does-not-exist
 		 */
 		if (strncmp(receive_buffer,"STOR",4) == 0) {
-				printf("PUT Command: %s\n", receive_buffer);
-				char filename[200];
-				strncpy(filename, &receive_buffer[5], 194);
-				sprintf(send_buffer, "550 File trandfer unsucessful\r\n");
-				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+			char filename[200];
+			strncpy(filename, &receive_buffer[5], 194);
+			printf("Get: %s\n", filename);
+			FILE *fin=fopen(filename,"w");//open tmp.txt file
+			sprintf(send_buffer, "150 recieve ascii\r\n");
+			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+			char temp_buffer[200];
+			n=0;
+			// TODO: make the loop reliant on recieving data
+			// Currently breaks upon recieving one line of data
+			while (true) {
+				while (true) {
+					if (active==0) bytes = recv(ns, &temp_buffer[n], 1, 0);
+					else bytes = recv(s_data_act, &temp_buffer[n], 1, 0);
+					printf("Recv : %s\n", temp_buffer);
+					if ((bytes < 0) || (bytes == 0)) break;
+			 		if (temp_buffer[n] == '\n') { /*end on a LF*/
+			 			temp_buffer[n] = '\0';
+			 			break;
+			 		}
+			 		if (temp_buffer[n] != '\r') n++; /*Trim CRs*/
+				}
+				fprintf(fin, "%s", temp_buffer);
+				break;
+			}
+			printf("final: %s\n", temp_buffer);
+			fclose(fin);
 
-				printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
-				printf("Connected to client\n");
+			sprintf(send_buffer, "550 File trandfer unsucessful\r\n");
+			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+			printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
 		}
 		// CWD Command
 		// TODO CD
@@ -331,7 +354,6 @@ int main(int argc, char *argv[]) {
 			sprintf(send_buffer, "220 CWD STUB FUNCTION\r\n");
 			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 			printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
-			printf("Connected to client\n");
 		}
 	 		//========================================================================
 	 }	//End of COMMUNICATION LOOP per CLIENT
