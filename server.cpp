@@ -20,15 +20,14 @@
 
 /**
  * TODO:
- 		Task - assignee
  *  Change to IPV6 data structures (might have to do this before implementing commands) -
  *			https://msdn.microsoft.com/en-us/library/windows/desktop/ms740504(v=vs.85).aspx
  *			https://msdn.microsoft.com/en-us/library/windows/desktop/ms737530(v=vs.85).aspx
  *			https://msdn.microsoft.com/en-us/library/zx63b042.aspx
- *	Implement put (STOR) -
- *  Implement get (RETR) -
- *  Implement cd (CWD) -
- *  Documentation (last) - group
+ *	Implement put (STOR) - Basic implementation, needs error checks
+ *  Implement get (RETR) - Basic implementation, needs error checks
+ *  Implement cd (CWD) - Basic implementation, needs error checks
+ *  Documentation (last) -
  */
 //==============================================================================
 
@@ -36,6 +35,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <winsock2.h>
+#include <direct.h>
 
 #define WSVERS MAKEWORD(2,0)
 WSADATA wsadata;
@@ -182,9 +182,11 @@ int main(int argc, char *argv[]) {
 	 		if (bytes < 0) break;
 	 	}
 		// OPTS Command
+		// WIN 10 OPTS = UTF8 ON
+		// changed from 550 to 202 not implemented
 	 	if (strncmp(receive_buffer,"OPTS",4)==0)  {
 	 		printf("unrecognised command \n");
-	 		sprintf(send_buffer,"550 unrecognised command\r\n");
+	 		sprintf(send_buffer,"202 Not Implemented (OPTS)\r\n");
 	 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 	 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 	 		if (bytes < 0) break;
@@ -309,7 +311,7 @@ int main(int argc, char *argv[]) {
 	 		else closesocket(s_data_act);
 		}
 		// STOR Command
-		// TODO PUT
+		// TODO Check if user has permission to put file in here?
 		/*
 		 * Codes
 		 * 	226 file successfully transferred
@@ -321,8 +323,9 @@ int main(int argc, char *argv[]) {
 			printf("Get: %s\n", filename);
 			FILE *fin=fopen(filename,"w");//open tmp.txt file
 			sprintf(send_buffer, "150 recieve ascii\r\n");
+			printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
 			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-			char temp_buffer[200];
+			char temp_buffer[200]; // Could be bigger?
 			n=0;
 			while (true) {
 				if (active==0) bytes = recv(ns, &temp_buffer[n], 1, 0);
@@ -334,26 +337,28 @@ int main(int argc, char *argv[]) {
 			fclose(fin);
 			if (receive_buffer[0]) {
 				fprintf(fin, "%s", temp_buffer);
-				sprintf(send_buffer, "250 File transfer successful\r\n");
+				sprintf(send_buffer, "226 File transfer successful\r\n");
 				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 				printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
 			} else {
-				sprintf(send_buffer, "550 File transfer unsucessful\r\n");
+				sprintf(send_buffer, "550 File transfer unsuccessful\r\n");
 				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 				printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
 			}
 		}
 		// CWD Command
 		// TODO Check permissions (eg can't access VIP folder unless you are logged in as ?? etc)
+		// 250 = Requested file action okay, completed.
+		// 550 = Requested action not taken. File unavailable (e.g., file not found, no access).
 		if (strncmp(receive_buffer, "CWD", 3) == 0) {
 			char name[200];
-			strncpy(name, &receive_buffer[4], 195);
-			char foldername[203];
-			sprintf(foldername, "cd %s", name);
-			printf("Get: %s\n", foldername);
-
-			if (system(foldername) == 0) {
-				sprintf(send_buffer, "220 Changed directory to %s\r\n", name);
+			strncpy(name, &receive_buffer[4], 200);
+			char command[204];
+			sprintf(command, "cd %s", name);
+			printf("%s\n", command);
+			if (system(command) == 0) {
+				_chdir(name);
+				sprintf(send_buffer, "250 Changed directory to %s\r\n", name);
 				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 				printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
 			} else {
@@ -361,11 +366,11 @@ int main(int argc, char *argv[]) {
 				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 				printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
 			}
-
 		}
-	 		//========================================================================
-	 }	//End of COMMUNICATION LOOP per CLIENT
-	 		//========================================================================
+		//========================================================================
+		//End of COMMUNICATION LOOP per CLIENT
+		//========================================================================
+		}
 	 //********************************************************************
 	 //CLOSE SOCKET
 	 //********************************************************************
