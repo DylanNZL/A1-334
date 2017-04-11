@@ -334,7 +334,6 @@ int main(int argc, char *argv[]) {
 				if ((bytes < 0) || (bytes == 0)) break;
 				if (temp_buffer[n] != '\r') n++; /*Trim CRs*/
 			}
-			fclose(fin);
 			if (receive_buffer[0]) {
 				fprintf(fin, "%s", temp_buffer);
 				sprintf(send_buffer, "226 File transfer successful\r\n");
@@ -345,6 +344,7 @@ int main(int argc, char *argv[]) {
 				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 				printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
 			}
+			fclose(fin);
 		}
 		// CWD Command
 		// TODO Check permissions (eg can't access VIP folder unless you are logged in as ?? etc)
