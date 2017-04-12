@@ -108,6 +108,9 @@ int main(int argc, char *argv[]) {
 	//****************************************************************************
 	//============================================================================
   while (1) {//Start of MAIN LOOP
+		char user[50];
+		char pass[50];
+		bool vip = false;
   //============================================================================
  	 addrlen = sizeof(remoteaddr);
  	//****************************************************************************
@@ -161,14 +164,34 @@ int main(int argc, char *argv[]) {
 	 	printf("<< DEBUG INFO. >>: the message from the CLIENT reads: '%s\\r\\n' \n", receive_buffer);
 		// USER Command
 	 	if (strncmp(receive_buffer,"USER",4)==0)  {
-	 		printf("Logging in... \n");
-	 		sprintf(send_buffer,"331 Password required (anything will do really... :-) \r\n");
+			if (receive_buffer[5] == '\n' || receive_buffer[5] == '\r') {
+				sprintf(user, "Public User\n");
+				printf("User connected as %s", user);
+				sprintf(send_buffer,"331 Welcome public user, enter any password: \r\n");
+			} else {
+				strncpy(user, &receive_buffer[5], 54);
+				printf("User logging in as: %s", user);
+				sprintf(send_buffer,"331 Welcome %s, enter your password \r\n", user);
+			}
 	 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 	 		if (bytes < 0) break;
 	 	}
 		// PASS Command
 	 	if (strncmp(receive_buffer,"PASS",4)==0)  {
-	 		sprintf(send_buffer,"230 Public login sucessful \r\n");
+			if (strcmp(user, "Public User") == 0) {
+				sprintf(send_buffer,"230 Public login sucessful \r\n");
+			} else {
+				sprintf(pass, &receive_buffer[5], 54);
+				if (strncmp(user, "nhreyes", 7) == 0 && strncmp(pass, "334", 3) == 0) {
+					// Authenticated as VIP
+					vip = true;
+					sprintf(send_buffer,"230 successfully Authenticated as %s \r\n", user);
+				} else {
+					 vip = false;
+					 sprintf(send_buffer,"230 %s login sucessful \r\n", user);
+				 }
+			}
+
 	 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 	 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 	 		if (bytes < 0) break;
