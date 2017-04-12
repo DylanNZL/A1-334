@@ -31,14 +31,21 @@
  */
 //==============================================================================
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <winsock2.h>
-#include <direct.h>
+#define USE_IPV6 true
+#define DEFAULT_PORT "1234"
+#define _WIN32_WINNT 0x501
 
-#define WSVERS MAKEWORD(2,0)
-WSADATA wsadata;
+#include <winsock2.h>
+#include <ws2tcpip.h> //required by getaddrinfo() and special constants
+#include <stdlib.h>
+#include <stdio.h>
+#include <iostream>
+#include <direct.h>
+#define WSVERS MAKEWORD(2,2) /* Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h */
+					  //The high-order byte specifies the minor version number; 
+					  //the low-order byte specifies the major version number.
+
+WSADATA wsadata; //Create a WSADATA object called wsadata.
 
 //******************************************************************************
 //MAIN
@@ -47,6 +54,7 @@ int main(int argc, char *argv[]) {
 //******************************************************************************
 // INITIALIZATION
 //******************************************************************************
+	
 	int err = WSAStartup(WSVERS, &wsadata);
 
 	if (err != 0) {
@@ -55,15 +63,46 @@ int main(int argc, char *argv[]) {
 		 printf("WSAStartup failed with error: %d\n", err);
 		 exit(1);
 	}
-	// TODO: Convert to ipv6 data structures
-	struct sockaddr_in localaddr,remoteaddr;  //ipv4 only
-	struct sockaddr_in local_data_addr_act; //ipv4 only
+	
+	struct addrinfo *result = NULL;
+	struct addrinfo hints;
+	
+	char clientHost[NI_MAXHOST]; 
+	char clientService[NI_MAXSERV];
+	
+	// struct addrinfo *ptr = NULL;
 
-	//struct sockaddr_storage localaddr, remoteaddr; // IPV6-compatible
-	//struct sockaddr_storage local_data_addr_act; // IPV6-compatible
+	memset(&hints, 0, sizeof(struct addrinfo));
+
+	if(USE_IPV6){
+		hints.ai_family = AF_INET6;  
+	}	 else { //IPV4
+		hints.ai_family = AF_INET;
+	}
+	
+	int iResult;
+	
+	if (argc == 2) {
+		iResult = getaddrinfo(NULL, argv[1], &hints, &result);
+	} 	else {
+		iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result);
+	}
+	
+	if (iResult != 0) {
+		printf("getaddrinfo failed");
+		exit(69);
+	}
+	
+	// TODO: Convert to ipv6 data structures
+	//struct sockaddr_in localaddr,remoteaddr;  //ipv4 only
+	//struct sockaddr_in local_data_addr_act; //ipv4 only
+
+	struct sockaddr_storage localaddr, remoteaddr; // IPV6-compatible
+	struct sockaddr_storage local_data_addr_act; // IPV6-compatible
 
 	SOCKET s,ns;
 	SOCKET ns_data, s_data_act;
+	
 	char send_buffer[200],receive_buffer[200];
 	ns_data=INVALID_SOCKET;
 	int active=0;
@@ -78,20 +117,16 @@ int main(int argc, char *argv[]) {
 	//****************************************************************************
 	//SOCKET
 	//****************************************************************************
-	s = socket(PF_INET, SOCK_STREAM, 0);
-  if (s <0) {
- 	 printf("socket failed\n");
-  }
-  localaddr.sin_family = AF_INET; // IPV4 Version
-	//localaddr.sin_family = AF_INET6; // IPV6 and IPV4 compatable (http://www.ibm.com/support/knowledgecenter/ssw_ibm_i_71/rzab6/uafinet6.htm)
+	s = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+	if (s <0) {
+		printf("socket failed\n");
+		exit(69);
+	}
+  //localaddr.sin_family = AF_INET; // IPV4 Version
+	localaddr.ss_family = AF_UNSPEC; // IPV6 and IPV4 compatable (http://www.ibm.com/support/knowledgecenter/ssw_ibm_i_71/rzab6/uafinet6.htm)
   //CONTROL CONNECTION:  port number = content of argv[1]
-  if (argc == 2) {
- 	 localaddr.sin_port = htons((u_short)atoi(argv[1])); //ipv4 only
-  }
-  else {
- 	 localaddr.sin_port = htons(1234);//default listening port //ipv4 only
-  }
-  localaddr.sin_addr.s_addr = INADDR_ANY;//server address should be local
+
+  //localaddr.sin_addr.s_addr = INADDR_ANY;//server address should be local
 	//****************************************************************************
 	// BIND
 	//****************************************************************************
@@ -99,6 +134,7 @@ int main(int argc, char *argv[]) {
 		printf("Bind failed!\n");
 		exit(0);
 	}
+	freeaddrinfo(result);
 	//****************************************************************************
 	//LISTEN
 	//****************************************************************************
@@ -123,8 +159,20 @@ int main(int argc, char *argv[]) {
  	 if (ns < 0 ) break;
 
  	 printf("\n============================================================================\n");
- 	 printf("connected to [CLIENT's IP %s , port %d] through SERVER's port %d",
- 			 inet_ntoa(remoteaddr.sin_addr),ntohs(remoteaddr.sin_port),ntohs(localaddr.sin_port)); //ipv4 only
+ 	 
+	 memset(clientHost, 0, sizeof(clientHost));
+	memset(clientService, 0, sizeof(clientService));
+
+      if (getnameinfo((struct sockaddr *)&remoteaddr, addrlen, clientHost, sizeof(clientHost),
+                    clientService, sizeof(clientService), NI_NUMERICHOST) != 0) {
+                      printf("\nError detected: getnameinfo() failed \n");
+                      exit(1);
+                    } else {
+                      printf("\nConnected to <<<CLIENT>>> with IP address:%s, at Port:%s\n",clientHost, clientService);
+                    }
+	 
+	//inet_ntoa(remoteaddr.sin_addr),ntohs(remoteaddr.sin_port),ntohs(localaddr.sin_port)); //ipv4 only
+	 
  	 printf("\n============================================================================\n");
  	 //printf("detected CLIENT's port number: %d\n", ntohs(remoteaddr.sin_port));
  	 //printf("connected to CLIENT's IP %s at port %d of SERVER\n",
@@ -247,18 +295,22 @@ int main(int argc, char *argv[]) {
 	 			 //if (bytes < 0) break;
 	 			break;
 	 		}
-	 		local_data_addr_act.sin_family=AF_INET;//local_data_addr_act  //ipv4 only
+	 		//local_data_addr_act.sin_family=AF_INET;//local_data_addr_act  //ipv4 only
+			local_data_addr_act.ss_family=AF_UNSPEC;//local_data_addr_act  //ipv4 only
+			
 	 		sprintf(ip_decimal, "%d.%d.%d.%d", act_ip[0], act_ip[1], act_ip[2],act_ip[3]);
 	 		printf("\tCLIENT's IP is %s\n",ip_decimal);  //IPv4 format
-	 		local_data_addr_act.sin_addr.s_addr=inet_addr(ip_decimal);  //ipv4 only
+	 		//local_data_addr_act.sin_addr.s_addr=inet_addr(ip_decimal);  //ipv4 only
+			
+			
 	 		port_dec=act_port[0];
 	 		port_dec=port_dec << 8;
 	 		port_dec=port_dec+act_port[1];
 	 		printf("\tCLIENT's Port is %d\n",port_dec);
 	 		printf("===================================================\n");
-	 		local_data_addr_act.sin_port=htons(port_dec); //ipv4 only
+	 		//local_data_addr_act.sin_port=htons(port_dec); //ipv4 only
 	 		if (connect(s_data_act, (struct sockaddr *)&local_data_addr_act, (int) sizeof(struct sockaddr)) != 0){
-	 			printf("trying connection in %s %d\n",inet_ntoa(local_data_addr_act.sin_addr),ntohs(local_data_addr_act.sin_port));
+	 			//printf("trying connection in %s %d\n",inet_ntoa(local_data_addr_act.sin_addr),ntohs(local_data_addr_act.sin_port));
 	 			sprintf(send_buffer, "425 Something is wrong, can't start active connection... \r\n");
 	 			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 	 			printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
@@ -398,7 +450,7 @@ int main(int argc, char *argv[]) {
 	 //CLOSE SOCKET
 	 //********************************************************************
 	  closesocket(ns);
-	  printf("DISCONNECTED from %s\n",inet_ntoa(remoteaddr.sin_addr));
+	  //printf("DISCONNECTED from %s\n",inet_ntoa(remoteaddr.sin_addr));
 	  //sprintf(send_buffer, "221 Bye bye, server close the connection ... \r\n");
 	  //printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 	  //bytes = send(ns, send_buffer, strlen(send_buffer), 0);

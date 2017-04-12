@@ -22,3 +22,4 @@ if %clean% == y (
 make
 @echo server.exe 1155
 server.exe 1155
+pause
