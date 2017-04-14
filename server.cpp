@@ -19,13 +19,13 @@
  *  Documentation (last) -
  */
 //==============================================================================
-#define USE_IPV6 false
+#define USE_IPV6 true
 #define DEFAULT_PORT "1234"
 #define _WIN32_WINNT 0x0A00 // win 10? allows use of getaddrinfo which requires 0x501 or up : https://msdn.microsoft.com/en-us/library/6sehtctf.aspx
 #define WSVERS MAKEWORD(2,2) // Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h
-#pragma comment(lib, "Ws2_32.lib")
+//#pragma comment(lib, "Ws2_32.lib")
 #include <winsock2.h>
-#include <ws2tcpip.h> //required by getaddrinfo() and InetPton
+#include <ws2tcpip.h> // required by getaddrinfo()
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
@@ -55,12 +55,9 @@ int main(int argc, char *argv[]) {
 	char clientService[NI_MAXSERV];
 
 	memset(&hints, 0, sizeof(struct addrinfo));
-
 	if (USE_IPV6){ hints.ai_family = AF_INET6; }
 	else { hints.ai_family = AF_INET; }
-
 	int iResult;
-
 	if (argc == 2) { iResult = getaddrinfo(NULL, argv[1], &hints, &result); }
 	else { iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result); }
 
@@ -68,12 +65,9 @@ int main(int argc, char *argv[]) {
 		printf("getaddrinfo failed");
 		exit(69);
 	}
-	// TODO: Convert to ipv6 data structures
-	//struct sockaddr_in localaddr,remoteaddr;  //ipv4 only
-	struct sockaddr_in local_data_addr4; //ipv4 only
-
 	struct sockaddr_storage localaddr, remoteaddr; // IPV6-compatible
-	struct sockaddr_in6 local_data_addr6; // IPV6 only
+	struct sockaddr_in local_data_addr4; // IPV4 only
+	struct sockaddr_in6 local_data_addr6; // IPV6 Compatible
 	SOCKET s,ns;
 	SOCKET ns_data, s_data_act;
 
@@ -83,7 +77,7 @@ int main(int argc, char *argv[]) {
 	int n, bytes, addrlen;
 
 	printf("\n===============================\n");
-	printf("       159.334 FTP Server            ");
+	printf("       159.334 FTP Server          ");
 	printf("\n===============================\n");
 
 	memset(&localaddr,0,sizeof(localaddr)); //clean up the structure
@@ -282,38 +276,48 @@ int main(int argc, char *argv[]) {
 	 		}
 	 	}
 		// EPRT (IPV6)
-		// IPV6: EPRT |2|::1|50149|\r\n 
-		// THIS IS THE IPV6 VERSION
+		// IPV6: EPRT |2|::1|50149|\r\n
+		// THIS IS THE IPV6 VERSION OF PORT
 		// TODO: Translate the ipv6 address from string to in6_addr (IPV6 address)
 		if  (strncmp(receive_buffer, "EPRT", 4) == 0) {
 			s_data_act = socket(AF_INET6, SOCK_STREAM, 0);
+			printf("%s\n", receive_buffer);
 	 		//local variables
-	 		int family, port;
-			char address[129];
+			char address[129], port[6];
+			memset(address, 0, sizeof(address));
+			memset(port, 0, sizeof(port));
+			memset(&local_data_addr6, 0, sizeof(local_data_addr6));
 			active=1;//flag for active connection
-			int scannedItems = sscanf(receive_buffer, "EPRT |%d|%s|%d", &family, address, &port);
-			if(scannedItems < 3) {
-				sprintf(send_buffer,"501 Syntax error in arguments \r\n");
-				printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
-				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-				 //if (bytes < 0) break;
-				break;
+			int i = 8; // set i to skip this bit "EPRT |2|"
+			while (true) {
+				if (receive_buffer[i] == '|') { break; }
+				i++;
 			}
-			local_data_addr6.sin6_family = AF_INET6;
-			in6_addr *ad;
-			// convert string -> IPV6 data structure
-			//int r = inet_pton(AF_INET6, address, &ad);
-			//if (r != 1) { printf("address translation failure\n"); exit(104); }
-			//local_data_addr6.sin6_addr = ad;
-			local_data_addr6.sin6_port = port;
+			strncpy(address, &receive_buffer[8], i - 8);
+			address[i-7] = '\0'; i++;
+			strncpy(port, &receive_buffer[i], 6);
+			i = 0;
+			while (true) {
+				if (port[i] == '|') { port[i] = '\0'; break; }
+				i++;
+			}
+			printf("===================================================\n");
+			printf("    Active FTP mode, the client is listening...    \n");
+			printf("    CLIENT's IP is %s\n",address);
+			printf("    CLIENT's Port is %s\n", port);
+			printf("===================================================\n");
 
-	 		printf("===================================================\n");
-	 		printf("    Active FTP mode, the client is listening...    \n");
-	 		printf("    CLIENT's IP is %s\n",address);
-	 		printf("    CLIENT's Port is %d\n", port);
-	 		printf("===================================================\n");
-	 		if (connect(s_data_act, (struct sockaddr *)&local_data_addr6, (int) sizeof(struct sockaddr)) != 0) {
+			hints.ai_family = AF_INET6;
+			struct addrinfo *results;
+
+			i = getaddrinfo(address, port,  &hints, &results);
+			if (i != 0) {
+				printf("Failed to find address");
+				exit(13);
+			}
+	 		if (connect(s_data_act, results->ai_addr, results->ai_addrlen) != 0) {
 	 			sprintf(send_buffer, "425 Something is wrong, can't start active connection... \r\n");
+				printf("%d\n", WSAGetLastError());
 	 			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 	 			printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 	 			closesocket(s_data_act);
@@ -354,11 +358,8 @@ int main(int argc, char *argv[]) {
 	 	}
 		// RETR Command
 		// TODO check if the user has permission to get file?? (not sure if needed)
-		/*
-		 * Codes:
-		 *	226 if the file was successfully transferred
-		 *	550 for file-does-not-exist, permission-denied, etc.
-		 */
+		// 226 if the file was successfully transferred
+		// 550 for file-does-not-exist, permission-denied, etc.
 		if (strncmp(receive_buffer, "RETR", 4) == 0) {
 			char filename[200];
 			strncpy(filename, &receive_buffer[5], 194);
@@ -389,11 +390,8 @@ int main(int argc, char *argv[]) {
 		}
 		// STOR Command
 		// TODO Check if user has permission to put file in here?
-		/*
-		 * Codes
-		 * 	226 file successfully transferred
-		 *  550 file-does-not-exist
-		 */
+		//226 file successfully transferred
+		// 550 file-does-not-exist
 		if (strncmp(receive_buffer,"STOR",4) == 0) {
 			char filename[200];
 			strncpy(filename, &receive_buffer[5], 194);
