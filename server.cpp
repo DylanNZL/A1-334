@@ -73,7 +73,6 @@ int main(int argc, char *argv[]) {
 	printf("\n===============================\n");
 	printf("       159.334 FTP Server          ");
 	printf("\n===============================\n");
-
 	//****************************************************************************
 	//SOCKET
 	//****************************************************************************
@@ -399,8 +398,8 @@ int main(int argc, char *argv[]) {
 				fclose(fin);
 			}
 			// CWD Command
-			// TODO Check permissions (eg can't access VIP folder unless you are logged in as ?? etc)
 			// 250 = Requested file action okay, completed.
+			//  = no permission to enter folder
 			// 550 = Requested action not taken. File unavailable (e.g., file not found, no access).
 			if (strncmp(receive_buffer, "CWD", 3) == 0) {
 				char name[200];
@@ -409,10 +408,16 @@ int main(int argc, char *argv[]) {
 				sprintf(command, "cd %s", name);
 				printf("%s\n", command);
 				if (system(command) == 0) {
-					_chdir(name);
-					sprintf(send_buffer, "250 Changed directory to %s\r\n", name);
-					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-					printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
+					if (strcmp(name, "public_folder") != 0 && !vip) {
+						sprintf(send_buffer, "550 No permission to enter %s\r\n", name);
+						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+						printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
+					} else {
+						_chdir(name);
+						sprintf(send_buffer, "250 Changed directory to %s\r\n", name);
+						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+						printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
+					}
 				} else {
 					sprintf(send_buffer, "550 Directory Not Found\r\n");
 					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
