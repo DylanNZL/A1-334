@@ -1,11 +1,5 @@
 //==============================================================================
 //ACTIVE FTP SERVER Start-up Code for Assignment 1 (WinSock 2)
-
-//This code gives parts of the answers away.
-//Firstly, you must change parts of this program to make it IPv6-compliant (replace all data structures that work only with IPv4).
-//This step would require creating a makefile, as the IPv6-compliant functions require data structures that can be found only by linking with the appropritate library files.
-//The sample TCP server codes will help you accomplish this.
-
 //OVERVIEW
 //The connection is established by ignoring USER and PASS, but sending the appropriate 3 digit codes back
 //only the active FTP mode connection is implemented (watch out for firewall issues - do not block your own FTP server!).
@@ -16,35 +10,27 @@
 //In order to implement RETR you can use the LIST part as a startup.  RETR carries a filename,
 //so you need to replace the name when opening the file to send.
 
-//STOR is also a few steps away, use your implementation of RETR and invert it to save the file on the server's dir
-
 /**
  * TODO:
  *  Change to IPV6 data structures (might have to do this before implementing commands) -
- *			https://msdn.microsoft.com/en-us/library/windows/desktop/ms740504(v=vs.85).aspx
- *			https://msdn.microsoft.com/en-us/library/windows/desktop/ms737530(v=vs.85).aspx
- *			https://msdn.microsoft.com/en-us/library/zx63b042.aspx
  *	Implement put (STOR) - Basic implementation, needs error checks
  *  Implement get (RETR) - Basic implementation, needs error checks
  *  Implement cd (CWD) - Basic implementation, needs error checks
  *  Documentation (last) -
  */
 //==============================================================================
-
-#define USE_IPV6 true
+#define USE_IPV6 false
 #define DEFAULT_PORT "1234"
-#define _WIN32_WINNT 0x501
-
+#define _WIN32_WINNT 0x0A00 // win 10? allows use of getaddrinfo which requires 0x501 or up : https://msdn.microsoft.com/en-us/library/6sehtctf.aspx
+#define WSVERS MAKEWORD(2,2) // Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h
+#pragma comment(lib, "Ws2_32.lib")
 #include <winsock2.h>
-#include <ws2tcpip.h> //required by getaddrinfo() and special constants
+#include <ws2tcpip.h> //required by getaddrinfo() and InetPton
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
-#include <direct.h>
+#include <direct.h> // used for _chdir
 #include <string.h>
-#define WSVERS MAKEWORD(2,2) /* Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h */
-					  //The high-order byte specifies the minor version number;
-					  //the low-order byte specifies the major version number.
 
 WSADATA wsadata; //Create a WSADATA object called wsadata.
 
@@ -55,66 +41,53 @@ int main(int argc, char *argv[]) {
 //******************************************************************************
 // INITIALIZATION
 //******************************************************************************
-
 	int err = WSAStartup(WSVERS, &wsadata);
-
 	if (err != 0) {
 		 WSACleanup();
-	 // Tell the user that we could not find a usable WinsockDLL
+	 	// Tell the user that we could not find a usable WinsockDLL
 		 printf("WSAStartup failed with error: %d\n", err);
 		 exit(1);
 	}
 
 	struct addrinfo *result = NULL;
 	struct addrinfo hints;
-
 	char clientHost[NI_MAXHOST];
 	char clientService[NI_MAXSERV];
 
-	// struct addrinfo *ptr = NULL;
-
 	memset(&hints, 0, sizeof(struct addrinfo));
 
-	if(USE_IPV6){
-		hints.ai_family = AF_INET6;
-	}	 else { //IPV4
-		hints.ai_family = AF_INET;
-	}
+	if (USE_IPV6){ hints.ai_family = AF_INET6; }
+	else { hints.ai_family = AF_INET; }
 
 	int iResult;
 
-	if (argc == 2) {
-		iResult = getaddrinfo(NULL, argv[1], &hints, &result);
-	} 	else {
-		iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result);
-	}
+	if (argc == 2) { iResult = getaddrinfo(NULL, argv[1], &hints, &result); }
+	else { iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result); }
 
 	if (iResult != 0) {
 		printf("getaddrinfo failed");
 		exit(69);
 	}
-
 	// TODO: Convert to ipv6 data structures
 	//struct sockaddr_in localaddr,remoteaddr;  //ipv4 only
-	//struct sockaddr_in local_data_addr_act; //ipv4 only
+	struct sockaddr_in local_data_addr4; //ipv4 only
 
 	struct sockaddr_storage localaddr, remoteaddr; // IPV6-compatible
-	struct sockaddr_storage local_data_addr_act; // IPV6-compatible
-
+	struct sockaddr_in6 local_data_addr6; // IPV6 only
 	SOCKET s,ns;
 	SOCKET ns_data, s_data_act;
 
-	char send_buffer[200],receive_buffer[200];
-	ns_data=INVALID_SOCKET;
-	int active=0;
-	int n,bytes,addrlen;
+	char send_buffer[200], receive_buffer[200];
+	ns_data = INVALID_SOCKET;
+	int active = 0;
+	int n, bytes, addrlen;
 
 	printf("\n===============================\n");
-	printf("     159.334 FTP Server");
+	printf("       159.334 FTP Server            ");
 	printf("\n===============================\n");
 
-	memset(&localaddr,0,sizeof(localaddr));//clean up the structure
-	memset(&remoteaddr,0,sizeof(remoteaddr));//clean up the structure
+	memset(&localaddr,0,sizeof(localaddr)); //clean up the structure
+	memset(&remoteaddr,0,sizeof(remoteaddr)); //clean up the structure
 	//****************************************************************************
 	//SOCKET
 	//****************************************************************************
@@ -123,8 +96,6 @@ int main(int argc, char *argv[]) {
 		printf("socket failed\n");
 		exit(69);
 	}
-	//localaddr.ss_family = result->ai_family;
-  //CONTROL CONNECTION:  port number = content of argv[1]
 
   //localaddr.sin_addr.s_addr = INADDR_ANY;//server address should be local
 	//****************************************************************************
@@ -161,23 +132,16 @@ int main(int argc, char *argv[]) {
  	 printf("\n============================================================================\n");
 
 	 memset(clientHost, 0, sizeof(clientHost));
-	memset(clientService, 0, sizeof(clientService));
+	 memset(clientService, 0, sizeof(clientService));
 
-      if (getnameinfo((struct sockaddr *)&remoteaddr, addrlen, clientHost, sizeof(clientHost),
-                    clientService, sizeof(clientService), NI_NUMERICHOST) != 0) {
-                      printf("\nError detected: getnameinfo() failed \n");
-                      exit(1);
-                    } else {
-                      printf("\nConnected to <<<CLIENT>>> with IP address:%s, at Port:%s\n",clientHost, clientService);
-                    }
-
-	//inet_ntoa(remoteaddr.sin_addr),ntohs(remoteaddr.sin_port),ntohs(localaddr.sin_port)); //ipv4 only
-
+	 if (getnameinfo((struct sockaddr *)&remoteaddr, addrlen, clientHost, sizeof(clientHost), clientService, sizeof(clientService), NI_NUMERICHOST) != 0) {
+		 printf("\nError detected: getnameinfo() failed \n");
+		 exit(1);
+	 } else {
+		 printf("\nConnected to <<<CLIENT>>> with IP address: %s, at Port: %s\n", clientHost, clientService);
+	 }
+	 //inet_ntoa(remoteaddr.sin_addr),ntohs(remoteaddr.sin_port),ntohs(localaddr.sin_port)); //ipv4 only
  	 printf("\n============================================================================\n");
- 	 //printf("detected CLIENT's port number: %d\n", ntohs(remoteaddr.sin_port));
- 	 //printf("connected to CLIENT's IP %s at port %d of SERVER\n",
- 	 //    inet_ntoa(remoteaddr.sin_addr),ntohs(localaddr.sin_port));
- 	 //printf("detected CLIENT's port number: %d\n", ntohs(remoteaddr.sin_port));
  	//****************************************************************************
  	//Respond with welcome message
  	//****************************************************************************
@@ -271,20 +235,17 @@ int main(int argc, char *argv[]) {
 	 		if (bytes < 0) break;
 	 		closesocket(ns);
 	 	}
-		// PORT Command
-	 	if(strncmp(receive_buffer,"PORT",4) == 0) {
+		// PORT (IPV4) Command
+		// IPV4: PORT 127.0.0.1:50149\r\n
+	 	if(strncmp(receive_buffer, "PORT", 4) == 0) {
 	 		s_data_act = socket(AF_INET, SOCK_STREAM, 0);
 	 		//local variables
-	 		//unsigned char act_port[2];
 	 		int act_port[2];
 	 		int act_ip[4], port_dec;
 	 		char ip_decimal[40];
 	 		printf("===================================================\n");
 	 		printf("\n\tActive FTP mode, the client is listening... \n");
 	 		active=1;//flag for active connection
-	 		//int scannedItems = sscanf(receive_buffer, "PORT %d,%d,%d,%d,%d,%d",
-	 		//		&act_ip[0],&act_ip[1],&act_ip[2],&act_ip[3],
-	 		//     (int*)&act_port[0],(int*)&act_port[1]);
 	 		int scannedItems = sscanf(receive_buffer, "PORT %d,%d,%d,%d,%d,%d",
 	 			 &act_ip[0],&act_ip[1],&act_ip[2],&act_ip[3],
 	 				&act_port[0],&act_port[1]);
@@ -295,22 +256,19 @@ int main(int argc, char *argv[]) {
 	 			 //if (bytes < 0) break;
 	 			break;
 	 		}
-	 		//local_data_addr_act.sin_family=AF_INET;//local_data_addr_act  //ipv4 only
-			local_data_addr_act.ss_family=AF_UNSPEC;//local_data_addr_act  //ipv4 only
+			local_data_addr4.sin_family=AF_INET;
 
 	 		sprintf(ip_decimal, "%d.%d.%d.%d", act_ip[0], act_ip[1], act_ip[2],act_ip[3]);
 	 		printf("\tCLIENT's IP is %s\n",ip_decimal);  //IPv4 format
-	 		//local_data_addr_act.sin_addr.s_addr=inet_addr(ip_decimal);  //ipv4 only
-
+	 		local_data_addr4.sin_addr.s_addr=inet_addr(ip_decimal);  //ipv4 only
 
 	 		port_dec=act_port[0];
 	 		port_dec=port_dec << 8;
 	 		port_dec=port_dec+act_port[1];
 	 		printf("\tCLIENT's Port is %d\n",port_dec);
 	 		printf("===================================================\n");
-	 		//local_data_addr_act.sin_port=htons(port_dec); //ipv4 only
-	 		if (connect(s_data_act, (struct sockaddr *)&local_data_addr_act, (int) sizeof(struct sockaddr)) != 0){
-	 			//printf("trying connection in %s %d\n",inet_ntoa(local_data_addr_act.sin_addr),ntohs(local_data_addr_act.sin_port));
+	 		local_data_addr4.sin_port=htons(port_dec); //ipv4 only
+	 		if (connect(s_data_act, (struct sockaddr *)&local_data_addr4, (int) sizeof(struct sockaddr)) != 0) {
 	 			sprintf(send_buffer, "425 Something is wrong, can't start active connection... \r\n");
 	 			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 	 			printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
@@ -323,9 +281,53 @@ int main(int argc, char *argv[]) {
 	 			printf("Connected to client\n");
 	 		}
 	 	}
+		// EPRT (IPV6)
+		// IPV6: EPRT |2|::1|50149|\r\n 
+		// THIS IS THE IPV6 VERSION
+		// TODO: Translate the ipv6 address from string to in6_addr (IPV6 address)
+		if  (strncmp(receive_buffer, "EPRT", 4) == 0) {
+			s_data_act = socket(AF_INET6, SOCK_STREAM, 0);
+	 		//local variables
+	 		int family, port;
+			char address[129];
+			active=1;//flag for active connection
+			int scannedItems = sscanf(receive_buffer, "EPRT |%d|%s|%d", &family, address, &port);
+			if(scannedItems < 3) {
+				sprintf(send_buffer,"501 Syntax error in arguments \r\n");
+				printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+				 //if (bytes < 0) break;
+				break;
+			}
+			local_data_addr6.sin6_family = AF_INET6;
+			in6_addr *ad;
+			// convert string -> IPV6 data structure
+			//int r = inet_pton(AF_INET6, address, &ad);
+			//if (r != 1) { printf("address translation failure\n"); exit(104); }
+			//local_data_addr6.sin6_addr = ad;
+			local_data_addr6.sin6_port = port;
+
+	 		printf("===================================================\n");
+	 		printf("    Active FTP mode, the client is listening...    \n");
+	 		printf("    CLIENT's IP is %s\n",address);
+	 		printf("    CLIENT's Port is %d\n", port);
+	 		printf("===================================================\n");
+	 		if (connect(s_data_act, (struct sockaddr *)&local_data_addr6, (int) sizeof(struct sockaddr)) != 0) {
+	 			sprintf(send_buffer, "425 Something is wrong, can't start active connection... \r\n");
+	 			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+	 			printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+	 			closesocket(s_data_act);
+	 		}
+	 		else {
+	 			sprintf(send_buffer, "200 EPRT Command successful\r\n");
+	 			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+	 			printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+	 			printf("Connected to client\n");
+	 		}
+		}
 		// LIST Command
 	 	//technically, LIST is different than NLST,but we make them the same here
-	 	if ( (strncmp(receive_buffer,"LIST",4)==0) || (strncmp(receive_buffer,"NLST",4)==0))   {
+	 	if ((strncmp(receive_buffer,"LIST",4)==0) || (strncmp(receive_buffer,"NLST",4)==0))   {
 	 		//system("ls > tmp.txt");//change that to 'dir', so windows can understand
 	 		system("dir > tmp.txt");
 	 		FILE *fin=fopen("tmp.txt","r");//open tmp.txt file
