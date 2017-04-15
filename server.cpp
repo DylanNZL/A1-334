@@ -1,9 +1,4 @@
 //==============================================================================
-//ACTIVE FTP SERVER Start-up Code for Assignment 1 (WinSock 2)
-//OVERVIEW
-//The connection is established by ignoring USER and PASS, but sending the appropriate 3 digit codes back
-//only the active FTP mode connection is implemented (watch out for firewall issues - do not block your own FTP server!).
-
 /**
  * TODO:
  *  Change to IPV6 data structures (might have to do this before implementing commands) -
@@ -27,7 +22,6 @@
 #include <string.h>
 
 WSADATA wsadata; //Create a WSADATA object called wsadata.
-
 //******************************************************************************
 //MAIN
 //******************************************************************************
@@ -35,6 +29,7 @@ int main(int argc, char *argv[]) {
 //******************************************************************************
 // INITIALIZATION
 //******************************************************************************
+	// Attempt to instantiate with the winsock library
 	int err = WSAStartup(WSVERS, &wsadata);
 	if (err != 0) {
 		 WSACleanup();
@@ -42,7 +37,10 @@ int main(int argc, char *argv[]) {
 		 printf("WSAStartup failed with error: %d\n", err);
 		 exit(1);
 	}
-
+	printf("\n===============================\n");
+	printf("       159.334 FTP Server          ");
+	printf("\n===============================\n");
+	// Global variable declaration
 	struct addrinfo hints, *result = NULL;
 	struct sockaddr_storage localaddr, remoteaddr; // IPV6-compatible
 	struct sockaddr_in local_data_addr4; // IPV4 only (only used in Port)
@@ -50,8 +48,7 @@ int main(int argc, char *argv[]) {
 	char clientService[NI_MAXSERV];
 	char port[6];
 	SOCKET s,ns, ns_data, s_data_act;
-	char send_buffer[200], receive_buffer[200];
-
+	char send_buffer[BUFFER_SIZE], receive_buffer[BUFFER_SIZE];
 	int active = 0;
 	int n, bytes, addrlen;
 
@@ -69,10 +66,6 @@ int main(int argc, char *argv[]) {
 		printf("getaddrinfo failed");
 		exit(69);
 	}
-
-	printf("\n===============================\n");
-	printf("       159.334 FTP Server          ");
-	printf("\n===============================\n");
 	//****************************************************************************
 	//SOCKET
 	//****************************************************************************
@@ -81,7 +74,6 @@ int main(int argc, char *argv[]) {
 		printf("socket failed\n");
 		exit(69);
 	}
-
 	//****************************************************************************
 	// BIND
 	//****************************************************************************
@@ -98,19 +90,19 @@ int main(int argc, char *argv[]) {
 	//INFINITE LOOP
 	//****************************************************************************
 	//============================================================================
-  while (1) {//Start of MAIN LOOP
+  while (1) { // Start of MAIN LOOP
 		char user[50];
 		char pass[50];
 		bool vip = false;
 		memset(clientHost, 0, sizeof(clientHost));
  	  memset(clientService, 0, sizeof(clientService));
  	  addrlen = sizeof(remoteaddr);
+		printf("\n------------------------------------------------------------------------\n");
+	 	printf("SERVER is waiting for an incoming connection request...");
+	 	printf("\n------------------------------------------------------------------------\n");
 	 	//****************************************************************************
 	 	//NEW SOCKET newsocket = accept  //CONTROL CONNECTION
 	 	//****************************************************************************
-	 	printf("\n------------------------------------------------------------------------\n");
-	 	printf("SERVER is waiting for an incoming connection request...");
-	 	printf("\n------------------------------------------------------------------------\n");
 	 	ns = accept(s,(struct sockaddr *)(&remoteaddr),&addrlen);
 	 	if (ns < 0 ) break;
 		printf("\n============================================================================\n");
@@ -124,9 +116,9 @@ int main(int argc, char *argv[]) {
 	 	//****************************************************************************
  	  sprintf(send_buffer,"220 FTP Server ready. \r\n");
  	  bytes = send(ns, send_buffer, strlen(send_buffer), 0);
- 	 //===========================================================================
- 	 //COMMUNICATION LOOP per CLIENT
- 	 //===========================================================================
+ 	 	//===========================================================================
+ 	 	//COMMUNICATION LOOP per CLIENT
+ 	 	//===========================================================================
 	  while (1) {
 	 		n = 0;
 		 	//PROCESS message received from CLIENT
@@ -173,9 +165,9 @@ int main(int argc, char *argv[]) {
 						vip = true;
 						sprintf(send_buffer,"230 successfully Authenticated as %s \r\n", user);
 					} else {
-						 vip = false;
-						 sprintf(send_buffer,"230 %s login sucessful \r\n", user);
-					 }
+						vip = false;
+						sprintf(send_buffer,"230 %s login sucessful \r\n", user);
+					}
 				}
 		 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 		 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
@@ -216,8 +208,7 @@ int main(int argc, char *argv[]) {
 		 		int act_port[2];
 		 		int act_ip[4], port_dec;
 		 		char ip_decimal[40];
-		 		printf("===================================================\n");
-		 		printf("\n\tActive FTP mode, the client is listening... \n");
+
 		 		active=1;//flag for active connection
 		 		int scannedItems = sscanf(receive_buffer, "PORT %d,%d,%d,%d,%d,%d",
 		 			 &act_ip[0],&act_ip[1],&act_ip[2],&act_ip[3],
@@ -229,18 +220,18 @@ int main(int argc, char *argv[]) {
 		 			 //if (bytes < 0) break;
 		 			break;
 		 		}
-				local_data_addr4.sin_family=AF_INET;
-
-		 		sprintf(ip_decimal, "%d.%d.%d.%d", act_ip[0], act_ip[1], act_ip[2],act_ip[3]);
-		 		printf("\tCLIENT's IP is %s\n",ip_decimal);  //IPv4 format
-		 		local_data_addr4.sin_addr.s_addr=inet_addr(ip_decimal);  //ipv4 only
-
-		 		port_dec=act_port[0];
-		 		port_dec=port_dec << 8;
-		 		port_dec=port_dec+act_port[1];
-		 		printf("\tCLIENT's Port is %d\n",port_dec);
+				sprintf(ip_decimal, "%d.%d.%d.%d", act_ip[0], act_ip[1], act_ip[2],act_ip[3]);
+				local_data_addr4.sin_family = AF_INET;
+				local_data_addr4.sin_addr.s_addr = inet_addr(ip_decimal);  //ipv4 only
+				port_dec = act_port[0];
+				port_dec = port_dec << 8;
+				port_dec = port_dec + act_port[1];
+				local_data_addr4.sin_port = htons(port_dec); //ipv4 only
+				printf("===================================================\n");
+				printf("    Active FTP mode, the client is listening...    \n");
+		 		printf("    CLIENT's IP is %s\n", ip_decimal);
+		 		printf("    CLIENT's Port is %d\n",port_dec);
 		 		printf("===================================================\n");
-		 		local_data_addr4.sin_port=htons(port_dec); //ipv4 only
 		 		if (connect(s_data_act, (struct sockaddr *)&local_data_addr4, (int) sizeof(struct sockaddr)) != 0) {
 		 			sprintf(send_buffer, "425 Something is wrong, can't start active connection... \r\n");
 		 			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
@@ -259,13 +250,13 @@ int main(int argc, char *argv[]) {
 			// THIS IS THE IPV6 VERSION OF PORT
 			if  (strncmp(receive_buffer, "EPRT", 4) == 0) {
 				s_data_act = socket(AF_INET6, SOCK_STREAM, 0);
-				printf("%s\n", receive_buffer);
 		 		//local variables
 				char address[129], port[6];
 				memset(address, 0, sizeof(address));
 				memset(port, 0, sizeof(port));
-				active=1;//flag for active connection
-				int i = 8; // set i to skip this bit "EPRT |2|"
+				active = 1; // flag for active connection
+				int i = 8; // set i to skip this bit of the receive_buffer "EPRT |2|"
+
 				while (true) {
 					if (receive_buffer[i] == '|') { break; }
 					i++;
@@ -306,7 +297,7 @@ int main(int argc, char *argv[]) {
 				freeaddrinfo(results);
 			}
 			// LIST Command
-		 	//technically, LIST is different than NLST,but we make them the same here
+		 	// technically, LIST is different than NLST,but we make them the same here
 		 	if ((strncmp(receive_buffer,"LIST",4)==0) || (strncmp(receive_buffer,"NLST",4)==0))   {
 		 		//system("ls > tmp.txt");//change that to 'dir', so windows can understand
 		 		system("dir > tmp.txt");
@@ -315,21 +306,19 @@ int main(int argc, char *argv[]) {
 		 		sprintf(send_buffer,"150 Opening ASCII mode data connection... \r\n");
 		 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 		 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-		 		char temp_buffer[80];
+		 		char temp_buffer[BUFFER_SIZE];
 		 		while (!feof(fin)){
-		 			fgets(temp_buffer,78,fin);
+		 			fgets(temp_buffer,490,fin);
 		 			sprintf(send_buffer,"%s",temp_buffer);
 		 			if (active==0) send(ns_data, send_buffer, strlen(send_buffer), 0);
 		 			else send(s_data_act, send_buffer, strlen(send_buffer), 0);
 		 		}
 		 		fclose(fin);
-		 		//sprintf(send_buffer,"250 File transfer completed... \r\n");
 		 		sprintf(send_buffer,"226 File transfer complete. \r\n");
 		 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 		 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-		 		if (active==0 )closesocket(ns_data);
+		 		if (active == 0 )closesocket(ns_data);
 		 		else closesocket(s_data_act);
-		 		//OPTIONAL, delete the temporary file
 		 		system("del tmp.txt");
 		 	}
 			// RETR Command
@@ -338,20 +327,20 @@ int main(int argc, char *argv[]) {
 			// 550 for file-does-not-exist, permission-denied, etc.
 			if (strncmp(receive_buffer, "RETR", 4) == 0) {
 				char filename[200];
-				strncpy(filename, &receive_buffer[5], 194);
+				strncpy(filename, &receive_buffer[5], 490);
 				printf("Get: %s\n", filename);
-				FILE *fin=fopen(filename,"r");//open file
+				FILE *fin=fopen(filename,"r"); // Open file
 				if (fin == NULL) {
 					sprintf(send_buffer,"550 File '%s' not found\r\n", filename);
 			 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 			 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-				} else { // send file
+				} else { // Send file
 			 		sprintf(send_buffer,"150 Opening ASCII mode data connection... \r\n");
 			 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 			 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-			 		char temp_buffer[80];
+			 		char temp_buffer[BUFFER_SIZE];
 			 		while (!feof(fin)){
-			 			fgets(temp_buffer,78,fin);
+			 			fgets(temp_buffer,490,fin);
 			 			sprintf(send_buffer,"%s",temp_buffer);
 			 			if (active == 0) send(ns_data, send_buffer, strlen(send_buffer), 0);
 			 			else send(s_data_act, send_buffer, strlen(send_buffer), 0);
@@ -360,30 +349,30 @@ int main(int argc, char *argv[]) {
 			 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 			 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 				}
-		 		fclose(fin); // close file
-		 		if (active == 0 )closesocket(ns_data);
+		 		fclose(fin); // Close file
+		 		if (active == 0) closesocket(ns_data);
 		 		else closesocket(s_data_act);
 			}
 			// STOR Command
 			// TODO Check if user has permission to put file in here?
-			//226 file successfully transferred
+			// 226 file successfully transferred
 			// 550 file-does-not-exist
 			if (strncmp(receive_buffer,"STOR",4) == 0) {
-				char filename[200];
-				strncpy(filename, &receive_buffer[5], 194);
+				char filename[BUFFER_SIZE];
+				strncpy(filename, &receive_buffer[5], 490);
 				printf("Get: %s\n", filename);
-				FILE *fin=fopen(filename,"w");//open tmp.txt file
+				FILE *fin = fopen(filename,"w");
 				sprintf(send_buffer, "150 recieve ascii\r\n");
 				printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
 				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-				char temp_buffer[200]; // Could be bigger?
+				char temp_buffer[BUFFER_SIZE]; // Could be bigger?
 				n=0;
 				while (true) {
 					if (active==0) bytes = recv(ns, &temp_buffer[n], 1, 0);
 					else bytes = recv(s_data_act, &temp_buffer[n], 1, 0);
 					// If bytes == 0 it means its empty/done transferring
 					if ((bytes < 0) || (bytes == 0)) break;
-					if (temp_buffer[n] != '\r') n++; /*Trim CRs*/
+					if (temp_buffer[n] != '\r') n++; // Trim CRs
 				}
 				if (receive_buffer[0]) {
 					fprintf(fin, "%s", temp_buffer);
@@ -399,22 +388,26 @@ int main(int argc, char *argv[]) {
 			}
 			// CWD Command
 			// 250 = Requested file action okay, completed.
-			//  = no permission to enter folder
+			// 550 = No permission to enter folder (must be logged in as vip to access non public folder)
 			// 550 = Requested action not taken. File unavailable (e.g., file not found, no access).
+			// TODO: Remembers where the previous client changed directory to, need to reset after disconnection
 			if (strncmp(receive_buffer, "CWD", 3) == 0) {
-				char name[200];
-				strncpy(name, &receive_buffer[4], 200);
-				char command[204];
+				char name[BUFFER_SIZE];
+				strncpy(name, &receive_buffer[4], 490);
+				char command[BUFFER_SIZE];
 				sprintf(command, "cd %s", name);
 				printf("%s\n", command);
 				if (system(command) == 0) {
+					// If they are not trying to access public_folder and they are not authenticated as VIP, deny
 					if (strcmp(name, "public_folder") != 0 && !vip) {
 						sprintf(send_buffer, "550 No permission to enter %s\r\n", name);
 						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 						printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
 					} else {
 						_chdir(name);
-						sprintf(send_buffer, "250 Changed directory to %s\r\n", name);
+						if (strcmp(name, "..") == 0) { sprintf(send_buffer, "250 Changed directory to parent directory\r\n"); }
+						else if (strcmp(name, ".") == 0) { sprintf(send_buffer, "250 Changed directory to current folder?\r\n"); }
+						else { sprintf(send_buffer, "250 Changed directory to %s\r\n", name); }
 						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 						printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
 					}

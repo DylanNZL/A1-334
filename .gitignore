@@ -5,10 +5,8 @@
 #working files
 *.o
 *.exe
+# .txt's for testing transfers
+*.txt
 
 #vs files
 .vs
-
-# tmp file created by dir command
-tmp.txt
-testingserver.txt
