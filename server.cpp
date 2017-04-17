@@ -90,10 +90,17 @@ int main(int argc, char *argv[]) {
 	//INFINITE LOOP
 	//****************************************************************************
 	//============================================================================
+	bool root_level = true; // used to determine if a user can go up in directories (cd ..)
   while (1) { // Start of MAIN LOOP
+		// If server not at root directory, change directory back to root
+		if (root_level == false) {
+			printf("Switching to root\n");
+			_chdir("..");
+			root_level = true;
+		}
 		char user[50];
 		char pass[50];
-		bool vip = false;
+		bool vip = false; // determines access level
 		memset(clientHost, 0, sizeof(clientHost));
  	  memset(clientService, 0, sizeof(clientService));
  	  addrlen = sizeof(remoteaddr);
@@ -390,7 +397,11 @@ int main(int argc, char *argv[]) {
 			// 250 = Requested file action okay, completed.
 			// 550 = No permission to enter folder (must be logged in as vip to access non public folder)
 			// 550 = Requested action not taken. File unavailable (e.g., file not found, no access).
-			// TODO: Remembers where the previous client changed directory to, need to reset after disconnection
+			// Switches to root folder once a client disconnects
+			// Assumes a folder structure of
+			// root
+			//     -- vip_folder (closed to public)
+			//     -- public_folder
 			if (strncmp(receive_buffer, "CWD", 3) == 0) {
 				char name[BUFFER_SIZE];
 				strncpy(name, &receive_buffer[4], 490);
@@ -398,16 +409,29 @@ int main(int argc, char *argv[]) {
 				sprintf(command, "cd %s", name);
 				printf("%s\n", command);
 				if (system(command) == 0) {
+					// Trying to go up a directory while at root level
+					if (strcmp(name, "..") == 0 && root_level) {
+						sprintf(send_buffer, "550 You are at root level of server\r\n");
+						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+						printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
+					}
+					// Go up a directory when not at root directory
+					else if (strcmp(name, "..") == 0 && !root_level) {
+						_chdir(name);
+						sprintf(send_buffer, "250 Switched to root\r\n");
+						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+						printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
+					}
 					// If they are not trying to access public_folder and they are not authenticated as VIP, deny
-					if (strcmp(name, "public_folder") != 0 && !vip) {
+					else if (strcmp(name, "public_folder") != 0 && !vip) {
 						sprintf(send_buffer, "550 No permission to enter %s\r\n", name);
 						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 						printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
-					} else {
+					}
+					else {
 						_chdir(name);
-						if (strcmp(name, "..") == 0) { sprintf(send_buffer, "250 Changed directory to parent directory\r\n"); }
-						else if (strcmp(name, ".") == 0) { sprintf(send_buffer, "250 Changed directory to current folder?\r\n"); }
-						else { sprintf(send_buffer, "250 Changed directory to %s\r\n", name); }
+						root_level = false;
+						sprintf(send_buffer, "250 Changed directory to %s\r\n", name);
 						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 						printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
 					}
