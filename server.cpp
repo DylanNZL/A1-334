@@ -12,6 +12,8 @@
 #define BUFFER_SIZE 500
 #define _WIN32_WINNT 0x0A00 // win 10? allows use of getaddrinfo which requires 0x501 or up : https://msdn.microsoft.com/en-us/library/6sehtctf.aspx
 #define WSVERS MAKEWORD(2,2) // Use the MAKEWORD(lowbyte, highbyte) macro declared in Windef.h
+#define VIP_USER "nhreyes"
+#define VIP_PASS "334"
 
 #include <winsock2.h>
 #include <ws2tcpip.h> // required by getaddrinfo()
@@ -110,7 +112,7 @@ int main(int argc, char *argv[]) {
 	 	//****************************************************************************
 	 	//NEW SOCKET newsocket = accept  //CONTROL CONNECTION
 	 	//****************************************************************************
-	 	ns = accept(s,(struct sockaddr *)(&remoteaddr),&addrlen);
+	 	ns = accept(s,(struct sockaddr *)(&remoteaddr), &addrlen);
 	 	if (ns < 0 ) break;
 		printf("\n============================================================================\n");
 		if (getnameinfo((struct sockaddr *)&remoteaddr, addrlen, clientHost, sizeof(clientHost), clientService, sizeof(clientService), NI_NUMERICHOST) != 0) {
@@ -167,7 +169,7 @@ int main(int argc, char *argv[]) {
 					sprintf(send_buffer,"230 Public login sucessful \r\n");
 				} else {
 					sprintf(pass, &receive_buffer[5], 54);
-					if (strncmp(user, "nhreyes", 7) == 0 && strncmp(pass, "334", 3) == 0) {
+					if (strncmp(user, VIP_USER, 7) == 0 && strncmp(pass, VIP_PASS, 3) == 0) {
 						// Authenticated as VIP
 						vip = true;
 						sprintf(send_buffer,"230 successfully Authenticated as %s \r\n", user);
