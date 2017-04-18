@@ -1,21 +1,29 @@
 //==============================================================================
-/**
- * TODO:
- *  Change to IPV6 data structures - Done 15/4
- *	Implement put (STOR) - Basic implementation, needs error checks
- *  Implement get (RETR) - Basic implementation, needs error checks
- *  Implement cd (CWD) - Done 18/4
- *  Documentation (last) -
- */
- // Exit reasons
- // 0 - No errors, successful run
- // 1 - Unable to instantiate WSADATA
- // 2 - getaddrinfo failure during Start-up
- // 3 - Failed to initialize socket
- // 4 - Failed to bind socket
- // 5 - getnameinfo failed during client connection
- // 6 - getaddrinfo failure in EPRT command
- // 7 -
+// TODO:
+//  Change to IPV6 data structures - Done 15/4
+//	Implement put (STOR) - Basic implementation
+//  Implement get (RETR) - Basic implementation
+//  Implement cd (CWD) - Done 18/4
+//  Documentation (last) -
+// -----------------------------------------------------------------------------
+// You can change the username and password for the VIP user by editing the
+// VIP_USER and VIP_PASS below
+// -----------------------------------------------------------------------------
+// Group:
+// Dylan Cross - 15219491
+// Nate Fort - ??
+// Tom Sloman - ??
+// -----------------------------------------------------------------------------
+// Exit reasons
+// 0 - No errors, successful run
+// 1 - Unable to instantiate WSADATA
+// 2 - getaddrinfo failure during Start-up
+// 3 - Failed to initialize socket
+// 4 - Failed to bind socket
+// 5 - getnameinfo failed during client connection
+// 6 - getaddrinfo failure in EPRT command
+// -----------------------------------------------------------------------------
+// Documentation for class: https://docs.google.com/document/d/1AzcSFVUzmcCv_5JRzj31RuC-ryE89OwUvQsypoL__YU/edit?usp=sharing
 //==============================================================================
 #define USE_IPV6 true
 #define BUFFER_SIZE 500
@@ -255,7 +263,7 @@ int main(int argc, char *argv[]) {
 				printf("    Active FTP mode, the client is listening...    \n");
 		 		printf("    CLIENT's IP is %s\n", ip_decimal);
 		 		printf("    CLIENT's Port is %d\n",port_dec);
-		 		printf("========================================================================\n\n");
+		 		printf("========================================================================\n");
 		 		if (connect(s_data_act, (struct sockaddr *)&local_data_addr4, (int) sizeof(struct sockaddr)) != 0) {
 		 			sprintf(send_buffer, "425 Something is wrong, can't start active connection... \r\n");
 		 			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
@@ -295,11 +303,11 @@ int main(int argc, char *argv[]) {
 					if (port[i] == '|') { port[i] = '\0'; break; }
 					i++;
 				}
-				printf("===================================================\n");
-				printf("    Active FTP mode, the client is listening...    \n");
+				printf("========================================================================\n");
+				printf("    Active FTP mode, the client is listening...\n");
 				printf("    CLIENT's IP is %s\n",address);
 				printf("    CLIENT's Port is %s\n", port);
-				printf("===================================================\n");
+				printf("========================================================================\n");
 
 				hints.ai_family = AF_INET6;
 				struct addrinfo *results;
@@ -344,7 +352,7 @@ int main(int argc, char *argv[]) {
 		 		sprintf(send_buffer,"226 File transfer complete. \r\n");
 		 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 		 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-		 		if (active == 0 )closesocket(ns_data);
+		 		if (active == 0) closesocket(ns_data);
 		 		else closesocket(s_data_act);
 		 		system("del tmp.txt");
 		 	}
@@ -393,9 +401,9 @@ int main(int argc, char *argv[]) {
 				printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
 				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 				char temp_buffer[BUFFER_SIZE]; // Could be bigger?
-				n=0;
+				n = 0;
 				while (true) {
-					if (active==0) bytes = recv(ns, &temp_buffer[n], 1, 0);
+					if (active == 0) bytes = recv(ns, &temp_buffer[n], 1, 0);
 					else bytes = recv(s_data_act, &temp_buffer[n], 1, 0);
 					// If bytes == 0 it means its empty/done transferring
 					if ((bytes < 0) || (bytes == 0)) break;
@@ -417,7 +425,6 @@ int main(int argc, char *argv[]) {
 			// 250 = Requested file action okay, completed.
 			// 550 = No permission to enter folder (must be logged in as vip to access non public folder)
 			// 550 = Requested action not taken. File unavailable (e.g., file not found, no access).
-			// Switches to root folder once a client disconnects
 			// Assumes a folder structure of
 			// root
 			//     -- vip_folder (closed to public)
@@ -459,6 +466,38 @@ int main(int argc, char *argv[]) {
 					sprintf(send_buffer, "550 Directory Not Found\r\n");
 					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 					printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
+				}
+			}
+			// Help command
+			// 214 Available commands
+			if (strncmp(receive_buffer, "HELP", 4) == 0) {
+				// Send back implemented commands that the user can input.
+				// Not sure what calls SYST on win 10 ftp client
+				sprintf(send_buffer, "214 Available server commands:\n\nuser\t\tSYST\t\tdir\t\tls\t\tget\nput\t\tcd\t\tremotehelp\r\n");
+				printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+			}
+			// Make Directory command
+			// Only enabled for VIP
+			// 250 Successfully created directory
+			// 550 Action not allowed, or directory already exists
+			if (strncmp(receive_buffer, "XMKD", 4) == 0) {
+				if (!vip) {
+					sprintf(send_buffer, "550 need to be authenticated to make directories\r\n");
+					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+				} else {
+					char directory[BUFFER_SIZE];
+					strncpy(directory, &receive_buffer[5], 490);
+					if (_mkdir(directory) == 0) {
+						sprintf(send_buffer, "250 %s created\r\n", directory);
+						printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+					} else {
+						sprintf(send_buffer, "550 %s already exists\r\n", directory);
+						printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+					}
 				}
 			}
 			//========================================================================
