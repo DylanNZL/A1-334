@@ -1,12 +1,21 @@
 //==============================================================================
 /**
  * TODO:
- *  Change to IPV6 data structures (might have to do this before implementing commands) -
+ *  Change to IPV6 data structures - Done 15/4
  *	Implement put (STOR) - Basic implementation, needs error checks
  *  Implement get (RETR) - Basic implementation, needs error checks
- *  Implement cd (CWD) - Basic implementation, needs error checks
+ *  Implement cd (CWD) - Done 18/4
  *  Documentation (last) -
  */
+ // Exit reasons
+ // 0 - No errors, successful run
+ // 1 - Unable to instantiate WSADATA
+ // 2 - getaddrinfo failure during Start-up
+ // 3 - Failed to initialize socket
+ // 4 - Failed to bind socket
+ // 5 - getnameinfo failed during client connection
+ // 6 - getaddrinfo failure in EPRT command
+ // 7 -
 //==============================================================================
 #define USE_IPV6 true
 #define BUFFER_SIZE 500
@@ -25,7 +34,7 @@
 
 WSADATA wsadata; //Create a WSADATA object called wsadata.
 //******************************************************************************
-//MAIN
+// MAIN
 //******************************************************************************
 int main(int argc, char *argv[]) {
 //******************************************************************************
@@ -39,9 +48,9 @@ int main(int argc, char *argv[]) {
 		 printf("WSAStartup failed with error: %d\n", err);
 		 exit(1);
 	}
-	printf("\n===============================\n");
+	printf("\n========================================================================\n");
 	printf("       159.334 FTP Server          ");
-	printf("\n===============================\n");
+	printf("\n========================================================================\n");
 	// Global variable declaration
 	struct addrinfo hints, *result = NULL;
 	struct sockaddr_storage localaddr, remoteaddr; // IPV6-compatible
@@ -66,28 +75,28 @@ int main(int argc, char *argv[]) {
 
 	if (getaddrinfo(NULL, port, &hints, &result) != 0) { // getaddrinfo returns 0 if it worked
 		printf("getaddrinfo failed");
-		exit(69);
+		exit(2);
 	}
 	//****************************************************************************
 	//SOCKET
 	//****************************************************************************
 	s = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 	if (s < 0) {
-		printf("socket failed\n");
-		exit(69);
+		printf("Socket initialization failed\n");
+		exit(3);
 	}
 	//****************************************************************************
 	// BIND
 	//****************************************************************************
 	if (bind(s, result->ai_addr, result->ai_addrlen) != 0) {
 		printf("Bind failed!\n");
-		exit(0);
+		exit(4);
 	}
 	freeaddrinfo(result);
 	//****************************************************************************
 	//LISTEN
 	//****************************************************************************
-	listen(s,5);
+	listen(s, 5);
 	//****************************************************************************
 	//INFINITE LOOP
 	//****************************************************************************
@@ -109,36 +118,36 @@ int main(int argc, char *argv[]) {
 		printf("\n------------------------------------------------------------------------\n");
 	 	printf("SERVER is waiting for an incoming connection request...");
 	 	printf("\n------------------------------------------------------------------------\n");
-	 	//****************************************************************************
+	 	//**************************************************************************
 	 	//NEW SOCKET newsocket = accept  //CONTROL CONNECTION
-	 	//****************************************************************************
-	 	ns = accept(s,(struct sockaddr *)(&remoteaddr), &addrlen);
+	 	//**************************************************************************
+	 	ns = accept(s, (struct sockaddr *)(&remoteaddr), &addrlen);
 	 	if (ns < 0 ) break;
-		printf("\n============================================================================\n");
+		printf("\n========================================================================\n");
 		if (getnameinfo((struct sockaddr *)&remoteaddr, addrlen, clientHost, sizeof(clientHost), clientService, sizeof(clientService), NI_NUMERICHOST) != 0) {
 			printf("\nError detected: getnameinfo() failed \n");
-			exit(1);
+			exit(5);
 		} else { printf("\nConnected to <<<CLIENT>>> with IP address: %s, at Port: %s\n", clientHost, clientService); }
- 	  printf("\n============================================================================\n");
-	 	//****************************************************************************
+ 	  printf("\n========================================================================\n");
+	 	//**************************************************************************
 	 	//Respond with welcome message
-	 	//****************************************************************************
+	 	//**************************************************************************
  	  sprintf(send_buffer,"220 FTP Server ready. \r\n");
  	  bytes = send(ns, send_buffer, strlen(send_buffer), 0);
- 	 	//===========================================================================
+ 	 	//==========================================================================
  	 	//COMMUNICATION LOOP per CLIENT
- 	 	//===========================================================================
+ 	 	//==========================================================================
 	  while (1) {
 	 		n = 0;
 		 	//PROCESS message received from CLIENT
 		 	while (1) {
-			  //************************************************************************
+			  //**********************************************************************
 			  //RECEIVE
-			  //************************************************************************
+			  //**********************************************************************
 		 		bytes = recv(ns, &receive_buffer[n], 1, 0);//receive byte by byte...
-			  //************************************************************************
+			  //**********************************************************************
 			  //PROCESS REQUEST
-			  //************************************************************************
+			  //**********************************************************************
 		 		if ((bytes < 0) || (bytes == 0)) break;
 		 		if (receive_buffer[n] == '\n') { /*end on a LF*/
 		 			receive_buffer[n] = '\0';
@@ -150,6 +159,7 @@ int main(int argc, char *argv[]) {
 		 	if ((bytes < 0) || (bytes == 0)) break;
 		 	printf("<< DEBUG INFO. >>: the message from the CLIENT reads: '%s\\r\\n' \n", receive_buffer);
 			// USER Command
+			// 331 Registered username, now enter password
 		 	if (strncmp(receive_buffer,"USER",4)==0)  {
 				if (receive_buffer[5] == '\n' || receive_buffer[5] == '\r') {
 					sprintf(user, "Public User\n");
@@ -164,6 +174,7 @@ int main(int argc, char *argv[]) {
 		 		if (bytes < 0) break;
 		 	}
 			// PASS Command
+			// 230 Successful login
 		 	if (strncmp(receive_buffer,"PASS",4)==0)  {
 				if (strcmp(user, "Public User") == 0) {
 					sprintf(send_buffer,"230 Public login sucessful \r\n");
@@ -183,6 +194,7 @@ int main(int argc, char *argv[]) {
 		 		if (bytes < 0) break;
 		 	}
 			// SYST Command
+			// 215 Windows type
 		 	if (strncmp(receive_buffer,"SYST",4)==0)  {
 		 		printf("Information about the system \n");
 		 		sprintf(send_buffer,"215 Windows Type: WIN32\r\n");
@@ -192,7 +204,7 @@ int main(int argc, char *argv[]) {
 		 	}
 			// OPTS Command
 			// WIN 10 OPTS = UTF8 ON
-			// changed from 550 to 202 not implemented
+			// 202 not implemented
 		 	if (strncmp(receive_buffer,"OPTS",4)==0)  {
 		 		printf("unrecognised command \n");
 		 		sprintf(send_buffer,"202 Not Implemented (OPTS)\r\n");
@@ -200,7 +212,8 @@ int main(int argc, char *argv[]) {
 		 		bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 		 		if (bytes < 0) break;
 		 	}
-			//QUIT Command
+			// QUIT Command
+			// 221 Connection closed
 		 	if (strncmp(receive_buffer,"QUIT",4)==0)  {
 		 		printf("Quit \n");
 		 		sprintf(send_buffer,"221 Connection close by client\r\n");
@@ -211,14 +224,16 @@ int main(int argc, char *argv[]) {
 		 	}
 			// PORT (IPV4) Command
 			// IPV4: PORT 127.0.0.1:50149\r\n
+			// 501 Syntax errors
+			// 425 Can't start connection
+			// 200 Connection successful
 		 	if(strncmp(receive_buffer, "PORT", 4) == 0) {
 		 		s_data_act = socket(AF_INET, SOCK_STREAM, 0);
 		 		//local variables
 		 		int act_port[2];
 		 		int act_ip[4], port_dec;
 		 		char ip_decimal[40];
-
-		 		active=1;//flag for active connection
+		 		active = 1;//flag for active connection
 		 		int scannedItems = sscanf(receive_buffer, "PORT %d,%d,%d,%d,%d,%d",
 		 			 &act_ip[0],&act_ip[1],&act_ip[2],&act_ip[3],
 		 				&act_port[0],&act_port[1]);
@@ -236,11 +251,11 @@ int main(int argc, char *argv[]) {
 				port_dec = port_dec << 8;
 				port_dec = port_dec + act_port[1];
 				local_data_addr4.sin_port = htons(port_dec); //ipv4 only
-				printf("===================================================\n");
+				printf("\n========================================================================\n");
 				printf("    Active FTP mode, the client is listening...    \n");
 		 		printf("    CLIENT's IP is %s\n", ip_decimal);
 		 		printf("    CLIENT's Port is %d\n",port_dec);
-		 		printf("===================================================\n");
+		 		printf("========================================================================\n\n");
 		 		if (connect(s_data_act, (struct sockaddr *)&local_data_addr4, (int) sizeof(struct sockaddr)) != 0) {
 		 			sprintf(send_buffer, "425 Something is wrong, can't start active connection... \r\n");
 		 			bytes = send(ns, send_buffer, strlen(send_buffer), 0);
@@ -257,6 +272,8 @@ int main(int argc, char *argv[]) {
 			// EPRT (IPV6)
 			// IPV6: EPRT |2|::1|50149|\r\n
 			// THIS IS THE IPV6 VERSION OF PORT
+			// 425 Connection error
+			// 200 Connection successful
 			if  (strncmp(receive_buffer, "EPRT", 4) == 0) {
 				s_data_act = socket(AF_INET6, SOCK_STREAM, 0);
 		 		//local variables
@@ -288,7 +305,7 @@ int main(int argc, char *argv[]) {
 				struct addrinfo *results;
 				if (getaddrinfo(address, port,  &hints, &results) != 0) {
 					printf("Failed to find address");
-					exit(13);
+					exit(6);
 				}
 		 		if (connect(s_data_act, results->ai_addr, results->ai_addrlen) != 0) {
 		 			sprintf(send_buffer, "425 Something is wrong, can't start active connection... \r\n");
@@ -307,7 +324,8 @@ int main(int argc, char *argv[]) {
 			}
 			// LIST Command
 		 	// technically, LIST is different than NLST,but we make them the same here
-		 	if ((strncmp(receive_buffer,"LIST",4)==0) || (strncmp(receive_buffer,"NLST",4)==0))   {
+			// 226 File transfer successful
+		 	if ((strncmp(receive_buffer, "LIST", 4) == 0) || (strncmp(receive_buffer, "NLST", 4) == 0))   {
 		 		//system("ls > tmp.txt");//change that to 'dir', so windows can understand
 		 		system("dir > tmp.txt");
 		 		FILE *fin=fopen("tmp.txt","r");//open tmp.txt file
@@ -338,7 +356,7 @@ int main(int argc, char *argv[]) {
 				char filename[200];
 				strncpy(filename, &receive_buffer[5], 490);
 				printf("Get: %s\n", filename);
-				FILE *fin=fopen(filename,"r"); // Open file
+				FILE *fin = fopen(filename,"r"); // Open file
 				if (fin == NULL) {
 					sprintf(send_buffer,"550 File '%s' not found\r\n", filename);
 			 		printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
@@ -447,9 +465,9 @@ int main(int argc, char *argv[]) {
 			//End of COMMUNICATION LOOP per CLIENT
 			//========================================================================
 		}
-	 	//********************************************************************
+	 	//**************************************************************************
 	 	//CLOSE SOCKET
-	 	//********************************************************************
+	 	//**************************************************************************
 	 	closesocket(ns);
 	 	//==========================================================================
 	} //End of MAIN LOOP
