@@ -571,7 +571,8 @@ int main(int argc, char *argv[]) {
 			if (strncmp(receive_buffer, "HELP", 4) == 0) {
 				// Send back implemented commands that the user can input.
 				// Not sure what calls SYST on win 10 ftp client
-				sprintf(send_buffer, "214 Available server commands:\n\nuser\t\tSYST\t\tdir\t\tls\t\tget\nput\t\tdelete\t\tcd\t\tremotehelp\tmkdir\nrmdir\r\n");
+        char commands[100] = "\nuser\t\tSYST\t\tdir\t\tls\t\tget\nput\t\tdelete\t\trename\t\tcd\t\tremotehelp\nmkdir\t\trmdir\0";
+				sprintf(send_buffer, "214 Available server commands: \n%s\r\n", commands);
 				printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 			}
@@ -625,6 +626,16 @@ int main(int argc, char *argv[]) {
 						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 					}
 				}
+			}
+      // Print Working Directory (current directory)
+			// 250 Successfully deleted directory
+			// 550 Action not allowed, or directory doesn't exist
+			if (strncmp(receive_buffer, "XPWD", 4) == 0) {
+				memset(filename, '\0', sizeof(filename));
+        _getcwd(filename, sizeof(filename));
+        sprintf(send_buffer, "250 current dirtory: %s\r\n", filename);
+        printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+        bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 			}
 			//========================================================================
 			//End of COMMUNICATION LOOP per CLIENT
