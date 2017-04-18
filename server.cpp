@@ -441,6 +441,30 @@ int main(int argc, char *argv[]) {
 					fclose(fin);
 				}
 			}
+      // Delete file
+			// Only enabled for VIP
+      // Doesn't check if the file is needed to function so be careful what you delete
+			// 250 Successfully deleted file
+			// 550 Action not allowed, or directory doesn't exist
+			if (strncmp(receive_buffer, "DELE", 4) == 0) {
+				if (!vip) {
+					sprintf(send_buffer, "550 need to be authenticated as VIP to delete files\r\n");
+					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+				} else {
+					char filename[BUFFER_SIZE];
+					strncpy(filename, &receive_buffer[5], 490);
+          if (remove(filename) == 0) {
+            sprintf(send_buffer, "250 successfully deleted %s\r\n", filename);
+  					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+  					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+          } else {
+            sprintf(send_buffer, "550 could not find file %s\r\n", filename);
+  					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+  					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+          }
+				}
+			}
 			// CWD Command
 			// 250 = Requested file action okay, completed.
 			// 550 = No permission to enter folder (must be logged in as vip to access non public folder)
