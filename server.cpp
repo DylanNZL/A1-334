@@ -132,6 +132,7 @@ int main(int argc, char *argv[]) {
 		}
 		char user[50];
 		char pass[50];
+    char file[BUFFER_SIZE];
 		bool vip = false; // determines access level
 		memset(clientHost, 0, sizeof(clientHost));
  	  memset(clientService, 0, sizeof(clientService));
@@ -445,21 +446,75 @@ int main(int argc, char *argv[]) {
 			// Only enabled for VIP
       // Doesn't check if the file is needed to function so be careful what you delete
 			// 250 Successfully deleted file
-			// 550 Action not allowed, or directory doesn't exist
+			// 550 Could not find file, action not allowed
 			if (strncmp(receive_buffer, "DELE", 4) == 0) {
 				if (!vip) {
 					sprintf(send_buffer, "550 need to be authenticated as VIP to delete files\r\n");
 					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 				} else {
-					char filename[BUFFER_SIZE];
-					strncpy(filename, &receive_buffer[5], 490);
-          if (remove(filename) == 0) {
-            sprintf(send_buffer, "250 successfully deleted %s\r\n", filename);
+					memset(file, '\0', sizeof(file));
+					strncpy(file, &receive_buffer[5], 490);
+          if (remove(file) == 0) {
+            sprintf(send_buffer, "250 successfully deleted %s\r\n", file);
   					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
   					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
           } else {
-            sprintf(send_buffer, "550 could not find file %s\r\n", filename);
+            sprintf(send_buffer, "550 could not find file %s\r\n", file);
+  					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+  					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+          }
+				}
+			}
+      // Rename file
+      // Requires 2 commands:
+      //  - RNFR (Rename) From
+      //  - RNTO (Rename) To
+			// Only enabled for VIP
+      // Doesn't check if the file is needed to function so be careful what you rename
+			// 250 Successfully renamed file
+      // 350 need filename to rename to
+			// 550 Rename unsuccessful/filename(s) already exist
+			if (strncmp(receive_buffer, "RNFR", 4) == 0) {
+				if (!vip) {
+					sprintf(send_buffer, "550 need to be authenticated as VIP to delete files\r\n");
+					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+				} else {
+          memset(file, '\0', sizeof(file));
+					strncpy(file, &receive_buffer[5], 490);
+          if (FileExists(file)) {
+            sprintf(send_buffer, "350 rename %s to:\r\n", file);
+  					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+  					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+          } else {
+            sprintf(send_buffer, "550 could not find file %s\r\n", file);
+  					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+  					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+          }
+				}
+			}
+      if (strncmp(receive_buffer, "RNTO", 4) == 0) {
+				if (!vip) {
+					sprintf(send_buffer, "550 need to be authenticated as VIP to delete files\r\n");
+					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+				} else {
+          char fileTo[BUFFER_SIZE];
+          memset(fileTo, '\0', sizeof(fileTo));
+					strncpy(fileTo, &receive_buffer[5], 490);
+          if (!FileExists(fileTo)) {
+            if (rename(file, fileTo) == 0) {
+              sprintf(send_buffer, "250 renamed %s to %s\r\n", file, fileTo);
+    					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+    					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+            } else {
+              sprintf(send_buffer, "550 failed to rename %s to %s\r\n", file, fileTo);
+              printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+              bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+            }
+          } else {
+            sprintf(send_buffer, "550 %s already exists, cancelling rename\r\n", fileTo);
   					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
   					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
           }
@@ -516,7 +571,7 @@ int main(int argc, char *argv[]) {
 			if (strncmp(receive_buffer, "HELP", 4) == 0) {
 				// Send back implemented commands that the user can input.
 				// Not sure what calls SYST on win 10 ftp client
-				sprintf(send_buffer, "214 Available server commands:\n\nuser\t\tSYST\t\tdir\t\tls\t\tget\nput\t\tcd\t\tremotehelp\tmkdir\t\trmdir\r\n");
+				sprintf(send_buffer, "214 Available server commands:\n\nuser\t\tSYST\t\tdir\t\tls\t\tget\nput\t\tdelete\t\tcd\t\tremotehelp\tmkdir\nrmdir\r\n");
 				printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 			}
