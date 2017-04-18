@@ -450,35 +450,34 @@ int main(int argc, char *argv[]) {
 			//     -- vip_folder (closed to public)
 			//     -- public_folder
 			if (strncmp(receive_buffer, "CWD", 3) == 0) {
-				char name[BUFFER_SIZE];
-				strncpy(name, &receive_buffer[4], 490);
+				char directory[BUFFER_SIZE];
+				strncpy(directory, &receive_buffer[4], 490);
 				char command[BUFFER_SIZE];
-				sprintf(command, "cd %s", name);
-				printf("%s\n", command);
+				sprintf(command, "cd %s", directory);
 				if (system(command) == 0) {
 					// Trying to go up a directory while at root level
-					if (strcmp(name, "..") == 0 && root_level) {
+					if (strcmp(directory, "..") == 0 && root_level) {
 						sprintf(send_buffer, "550 You are at root level of server\r\n");
 						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 						printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
 					}
 					// Go up a directory when not at root directory
-					else if (strcmp(name, "..") == 0 && !root_level) {
-						_chdir(name);
+					else if (strcmp(directory, "..") == 0 && !root_level) {
+						_chdir(directory);
 						sprintf(send_buffer, "250 Switched to root\r\n");
 						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 						printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
 					}
 					// If they are not trying to access public_folder and they are not authenticated as VIP, deny
-					else if (strcmp(name, "public_folder") != 0 && !vip) {
-						sprintf(send_buffer, "550 No permission to enter %s\r\n", name);
+					else if (strcmp(directory, "public_folder") != 0 && !vip) {
+						sprintf(send_buffer, "550 No permission to enter %s\r\n", directory);
 						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 						printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
 					}
 					else {
-						_chdir(name);
+						_chdir(directory);
 						root_level = false;
-						sprintf(send_buffer, "250 Changed directory to %s\r\n", name);
+						sprintf(send_buffer, "250 Changed directory to %s\r\n", directory);
 						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 						printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
 					}
