@@ -500,6 +500,34 @@ int main(int argc, char *argv[]) {
 					}
 				}
 			}
+			// Remove Directory command
+			// Only enabled for VIP
+			// 250 Successfully deleted directory
+			// 550 Action not allowed, or directory doesn't exists
+			if (strncmp(receive_buffer, "XRMD", 4) == 0) {
+				if (!vip) {
+					sprintf(send_buffer, "550 need to be authenticated to delete directories\r\n");
+					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+				} else {
+					char directory[BUFFER_SIZE];
+					strncpy(directory, &receive_buffer[5], 490);
+					// Check that user isn't trying to delete essential directories
+					if (strncmp(directory, "vip_folder", 10) == 0 || strncmp(directory, "public_folder", 13) == 0) {
+						sprintf(send_buffer, "550 this folder is required by the server\r\n");
+						printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+					} else if (_rmdir(directory) == 0) {
+						sprintf(send_buffer, "250 %s removed\r\n", directory);
+						printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+					} else {
+						sprintf(send_buffer, "550 %s doesn't exist\r\n", directory);
+						printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+					}
+				}
+			}
 			//========================================================================
 			//End of COMMUNICATION LOOP per CLIENT
 			//========================================================================
