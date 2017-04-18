@@ -37,10 +37,23 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
-#include <direct.h> // used for _chdir
+#include <direct.h> // used for _chdir, _rmdir, _mkdir
 #include <string.h>
 
 WSADATA wsadata; //Create a WSADATA object called wsadata.
+
+/*
+ * Found here:
+ * https://blog.kowalczyk.info/article/8h/Check-if-file-exists-on-Windows.html
+ * Return TRUE if file 'fileName' exists
+ */
+bool FileExists(const TCHAR *fileName)
+{
+    DWORD fileAttr;
+    fileAttr = GetFileAttributes(fileName);
+    if (0xFFFFFFFF == fileAttr) return false;
+    return true;
+}
 //******************************************************************************
 // MAIN
 //******************************************************************************
@@ -395,31 +408,38 @@ int main(int argc, char *argv[]) {
 			if (strncmp(receive_buffer,"STOR",4) == 0) {
 				char filename[BUFFER_SIZE];
 				strncpy(filename, &receive_buffer[5], 490);
-				printf("Get: %s\n", filename);
-				FILE *fin = fopen(filename,"w");
-				sprintf(send_buffer, "150 recieve ascii\r\n");
-				printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
-				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-				char temp_buffer[BUFFER_SIZE]; // Could be bigger?
-				n = 0;
-				while (true) {
-					if (active == 0) bytes = recv(ns, &temp_buffer[n], 1, 0);
-					else bytes = recv(s_data_act, &temp_buffer[n], 1, 0);
-					// If bytes == 0 it means its empty/done transferring
-					if ((bytes < 0) || (bytes == 0)) break;
-					if (temp_buffer[n] != '\r') n++; // Trim CRs
-				}
-				if (receive_buffer[0]) {
-					fprintf(fin, "%s", temp_buffer);
-					sprintf(send_buffer, "226 File transfer successful\r\n");
-					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+				// Returns true if file exists
+				if (FileExists(filename)) {
+					sprintf(send_buffer, "550 file already exists!\r\n");
 					printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
+					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 				} else {
-					sprintf(send_buffer, "550 File transfer unsuccessful\r\n");
-					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+					FILE *fin = fopen(filename,"w");
+					sprintf(send_buffer, "150 recieve ascii\r\n");
 					printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
+					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+					char temp_buffer[BUFFER_SIZE]; // Could be bigger?
+					n = 0;
+					while (true) {
+						if (active == 0) bytes = recv(ns, &temp_buffer[n], 1, 0);
+						else bytes = recv(s_data_act, &temp_buffer[n], 1, 0);
+						// If bytes == 0 it means its empty/done transferring
+						if ((bytes < 0) || (bytes == 0)) break;
+						if (temp_buffer[n] != '\r') n++; // Trim CRs
+					}
+					temp_buffer[n] = '\0';
+					if (n != 0) {
+						fprintf(fin, "%s", temp_buffer);
+						sprintf(send_buffer, "226 File transfer successful\r\n");
+						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+						printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
+					} else {
+						sprintf(send_buffer, "550 File transfer unsuccessful\r\n");
+						bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+						printf("<< DEBUG INFO. >>: REPLY sent to client %s\n", send_buffer);
+					}
+					fclose(fin);
 				}
-				fclose(fin);
 			}
 			// CWD Command
 			// 250 = Requested file action okay, completed.
@@ -473,7 +493,7 @@ int main(int argc, char *argv[]) {
 			if (strncmp(receive_buffer, "HELP", 4) == 0) {
 				// Send back implemented commands that the user can input.
 				// Not sure what calls SYST on win 10 ftp client
-				sprintf(send_buffer, "214 Available server commands:\n\nuser\t\tSYST\t\tdir\t\tls\t\tget\nput\t\tcd\t\tremotehelp\r\n");
+				sprintf(send_buffer, "214 Available server commands:\n\nuser\t\tSYST\t\tdir\t\tls\t\tget\nput\t\tcd\t\tremotehelp\tmkdir\t\trmdir\r\n");
 				printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 			}
@@ -503,7 +523,7 @@ int main(int argc, char *argv[]) {
 			// Remove Directory command
 			// Only enabled for VIP
 			// 250 Successfully deleted directory
-			// 550 Action not allowed, or directory doesn't exists
+			// 550 Action not allowed, or directory doesn't exist
 			if (strncmp(receive_buffer, "XRMD", 4) == 0) {
 				if (!vip) {
 					sprintf(send_buffer, "550 need to be authenticated to delete directories\r\n");
