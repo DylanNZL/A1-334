@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
 		}
 		char user[50];
 		char pass[50];
-    char file[BUFFER_SIZE];
+    char filename[BUFFER_SIZE];
 		bool vip = false; // determines access level
 		memset(clientHost, 0, sizeof(clientHost));
  	  memset(clientService, 0, sizeof(clientService));
@@ -205,7 +205,7 @@ int main(int argc, char *argv[]) {
 					if (strncmp(user, VIP_USER, 7) == 0 && strncmp(pass, VIP_PASS, 3) == 0) {
 						// Authenticated as VIP
 						vip = true;
-						sprintf(send_buffer,"230 successfully Authenticated as %s \r\n", user);
+						sprintf(send_buffer,"230 successfully Authenticated as (VIP) %s \r\n", user);
 					} else {
 						vip = false;
 						sprintf(send_buffer,"230 %s login sucessful \r\n", user);
@@ -375,7 +375,7 @@ int main(int argc, char *argv[]) {
 			// 226 if the file was successfully transferred
 			// 550 for file-does-not-exist, permission-denied, etc.
 			if (strncmp(receive_buffer, "RETR", 4) == 0) {
-				char filename[200];
+				memset(filename, '\0', sizeof(filename));
 				strncpy(filename, &receive_buffer[5], 490);
 				printf("Get: %s\n", filename);
 				FILE *fin = fopen(filename,"r"); // Open file
@@ -407,7 +407,7 @@ int main(int argc, char *argv[]) {
 			// 226 file successfully transferred
 			// 550 file-does-not-exist
 			if (strncmp(receive_buffer,"STOR",4) == 0) {
-				char filename[BUFFER_SIZE];
+				memset(filename, '\0', sizeof(filename));
 				strncpy(filename, &receive_buffer[5], 490);
 				// Returns true if file exists
 				if (FileExists(filename)) {
@@ -453,14 +453,14 @@ int main(int argc, char *argv[]) {
 					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 				} else {
-					memset(file, '\0', sizeof(file));
-					strncpy(file, &receive_buffer[5], 490);
-          if (remove(file) == 0) {
-            sprintf(send_buffer, "250 successfully deleted %s\r\n", file);
+					memset(filename, '\0', sizeof(filename));
+					strncpy(filename, &receive_buffer[5], 490);
+          if (remove(filename) == 0) {
+            sprintf(send_buffer, "250 successfully deleted %s\r\n", filename);
   					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
   					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
           } else {
-            sprintf(send_buffer, "550 could not find file %s\r\n", file);
+            sprintf(send_buffer, "550 could not find file %s\r\n", filename);
   					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
   					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
           }
@@ -481,14 +481,14 @@ int main(int argc, char *argv[]) {
 					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
 					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 				} else {
-          memset(file, '\0', sizeof(file));
-					strncpy(file, &receive_buffer[5], 490);
-          if (FileExists(file)) {
-            sprintf(send_buffer, "350 rename %s to:\r\n", file);
+          memset(filename, '\0', sizeof(filename));
+					strncpy(filename, &receive_buffer[5], 490);
+          if (FileExists(filename)) {
+            sprintf(send_buffer, "350 rename %s to:\r\n", filename);
   					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
   					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
           } else {
-            sprintf(send_buffer, "550 could not find file %s\r\n", file);
+            sprintf(send_buffer, "550 could not find file %s\r\n", filename);
   					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
   					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
           }
@@ -504,12 +504,12 @@ int main(int argc, char *argv[]) {
           memset(fileTo, '\0', sizeof(fileTo));
 					strncpy(fileTo, &receive_buffer[5], 490);
           if (!FileExists(fileTo)) {
-            if (rename(file, fileTo) == 0) {
-              sprintf(send_buffer, "250 renamed %s to %s\r\n", file, fileTo);
+            if (rename(filename, fileTo) == 0) {
+              sprintf(send_buffer, "250 renamed %s to %s\r\n", filename, fileTo);
     					printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
     					bytes = send(ns, send_buffer, strlen(send_buffer), 0);
             } else {
-              sprintf(send_buffer, "550 failed to rename %s to %s\r\n", file, fileTo);
+              sprintf(send_buffer, "550 failed to rename %s to %s\r\n", filename, fileTo);
               printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
               bytes = send(ns, send_buffer, strlen(send_buffer), 0);
             }
