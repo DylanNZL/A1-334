@@ -11,8 +11,8 @@
 // -----------------------------------------------------------------------------
 // Group:
 // Dylan Cross - 15219491
-// Nate Fort - ??
-// Tom Sloman - ??
+// Nate Fort   - 15195444
+// Tom Sloman  - 15078758
 // -----------------------------------------------------------------------------
 // Exit reasons
 // 0 - No errors, successful run
@@ -25,6 +25,15 @@
 // -----------------------------------------------------------------------------
 // Documentation for class: https://docs.google.com/document/d/1AzcSFVUzmcCv_5JRzj31RuC-ryE89OwUvQsypoL__YU/edit?usp=sharing
 //==============================================================================
+
+// Ask Napoleon
+/*
+ * inet_pton doesn't work?
+ * Buffer size matter?
+ * Allowed to implment extra commands for fun?
+ * IPv6 EPRT v IPv4 PORT
+ * Use of FileExists function from the internet
+ */
 #define USE_IPV6 true
 #define BUFFER_SIZE 500
 #define _WIN32_WINNT 0x0A00 // win 10? allows use of getaddrinfo which requires 0x501 or up : https://msdn.microsoft.com/en-us/library/6sehtctf.aspx
@@ -37,7 +46,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
-#include <direct.h> // used for _chdir, _rmdir, _mkdir
+#include <direct.h> // used for _chdir, _rmdir, _mkdir _getcwd
 #include <string.h>
 
 WSADATA wsadata; //Create a WSADATA object called wsadata.
@@ -293,15 +302,14 @@ int main(int argc, char *argv[]) {
 		 	}
 			// EPRT (IPV6)
 			// IPV6: EPRT |2|::1|50149|\r\n
-			// THIS IS THE IPV6 VERSION OF PORT
 			// 425 Connection error
 			// 200 Connection successful
 			if  (strncmp(receive_buffer, "EPRT", 4) == 0) {
 				s_data_act = socket(AF_INET6, SOCK_STREAM, 0);
 		 		//local variables
 				char address[129], port[6];
-				memset(address, 0, sizeof(address));
-				memset(port, 0, sizeof(port));
+				memset(address, '\0', sizeof(address));
+				memset(port, '\0', sizeof(port));
 				active = 1; // flag for active connection
 				int i = 8; // set i to skip this bit of the receive_buffer "EPRT |2|"
 
@@ -566,16 +574,6 @@ int main(int argc, char *argv[]) {
 					printf("<< DEBUG INFO. >>: REPLY sent to client %s\r\n", send_buffer);
 				}
 			}
-			// Help command
-			// 214 Available commands
-			if (strncmp(receive_buffer, "HELP", 4) == 0) {
-				// Send back implemented commands that the user can input.
-				// Not sure what calls SYST on win 10 ftp client
-        char commands[100] = "\nuser\t\tSYST\t\tdir\t\tls\t\tget\nput\t\tdelete\t\trename\t\tcd\t\tremotehelp\nmkdir\t\trmdir\0";
-				sprintf(send_buffer, "214 Available server commands: \n%s\r\n", commands);
-				printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
-				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
-			}
 			// Make Directory command
 			// Only enabled for VIP
 			// 250 Successfully created directory
@@ -636,6 +634,16 @@ int main(int argc, char *argv[]) {
         sprintf(send_buffer, "250 current dirtory: %s\r\n", filename);
         printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
         bytes = send(ns, send_buffer, strlen(send_buffer), 0);
+			}
+      // Help command
+			// 214 Available commands
+			if (strncmp(receive_buffer, "HELP", 4) == 0) {
+				// Send back implemented commands that the user can input.
+				// Not sure what calls SYST on win 10 ftp client
+        char commands[100] = "\nuser\t\tSYST\t\tdir\t\tls\t\tget\nput\t\tdelete\t\trename\t\tcd\t\tremotehelp\nmkdir\t\trmdir\t\tpwd\0";
+				sprintf(send_buffer, "214 Available server commands: \n%s\r\n", commands);
+				printf("<< DEBUG INFO. >>: REPLY sent to CLIENT: %s\n", send_buffer);
+				bytes = send(ns, send_buffer, strlen(send_buffer), 0);
 			}
 			//========================================================================
 			//End of COMMUNICATION LOOP per CLIENT
