@@ -1,11 +1,4 @@
 //==============================================================================
-// TODO:
-//  Change to IPV6 data structures - Done 15/4
-//	Implement put (STOR) - Basic implementation
-//  Implement get (RETR) - Basic implementation
-//  Implement cd (CWD) - Done 18/4
-//  Documentation (last) -
-// -----------------------------------------------------------------------------
 // You can change the username and password for the VIP user by editing the
 // VIP_USER and VIP_PASS below
 // -----------------------------------------------------------------------------
@@ -370,7 +363,6 @@ int main(int argc, char *argv[]) {
 		 		system("del tmp.txt");
 		 	}
 			// RETR Command
-			// TODO check if the user has permission to get file?? (not sure if needed)
 			// 226 if the file was successfully transferred
 			// 550 for file-does-not-exist, permission-denied, etc.
 			if (strncmp(receive_buffer, "RETR", 4) == 0) {
@@ -402,7 +394,6 @@ int main(int argc, char *argv[]) {
 		 		else closesocket(s_data_act);
 			}
 			// STOR Command
-			// TODO Check if user has permission to put file in here?
 			// 226 file successfully transferred
 			// 550 file-does-not-exist
 			if (strncmp(receive_buffer,"STOR",4) == 0) {
