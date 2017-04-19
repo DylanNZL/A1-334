@@ -25,15 +25,6 @@
 // -----------------------------------------------------------------------------
 // Documentation for class: https://docs.google.com/document/d/1AzcSFVUzmcCv_5JRzj31RuC-ryE89OwUvQsypoL__YU/edit?usp=sharing
 //==============================================================================
-
-// Ask Napoleon
-/*
- * inet_pton doesn't work?
- * Buffer size matter?
- * Allowed to implment extra commands for fun?
- * IPv6 EPRT v IPv4 PORT
- * Use of FileExists function from the internet
- */
 #define USE_IPV6 true
 #define BUFFER_SIZE 500
 #define _WIN32_WINNT 0x0A00 // win 10? allows use of getaddrinfo which requires 0x501 or up : https://msdn.microsoft.com/en-us/library/6sehtctf.aspx
