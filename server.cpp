@@ -16,7 +16,7 @@
 // 5 - getnameinfo failed during client connection
 // 6 - getaddrinfo failure in EPRT command
 // -----------------------------------------------------------------------------
-// Documentation for class: https://docs.google.com/document/d/1AzcSFVUzmcCv_5JRzj31RuC-ryE89OwUvQsypoL__YU/edit?usp=sharing
+// NOTE: Data transfers assume ASCII encoding and won't work as intended with other ways of encoding
 //==============================================================================
 #define USE_IPV6 true
 #define BUFFER_SIZE 500
@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
 	if (USE_IPV6) { hints.ai_family = AF_INET6; }
 	else { hints.ai_family = AF_INET; }
 	if (argc == 2) { strcpy(port, argv[1]); }
-	else { strcpy(port, "1234\0"); }
+	else { strcpy(port, "1234\0"); } // NOTE default port if not provided when running the program
 
 	if (getaddrinfo(NULL, port, &hints, &result) != 0) { // getaddrinfo returns 0 if it worked
 		printf("getaddrinfo failed");
